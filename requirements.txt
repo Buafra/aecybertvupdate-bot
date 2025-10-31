@@ -1,9 +1,4 @@
 python-telegram-bot==21.4
 httpx>=0.27,<0.29
-httpcore==1.*
-anyio>=4.0
-h11>=0.16
-idna>=3.6
-certifi
 uvloop
 tzdata>=2024.1
