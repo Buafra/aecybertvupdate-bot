@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, Message, InputMediaPhoto
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
 )
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -34,9 +34,9 @@ def env_int(name: str, default: Optional[int] = None) -> Optional[int]:
     except Exception:
         raise ValueError(f"Environment variable {name} must be an integer, got: {v!r}")
 
-BOT_TOKEN    = os.getenv("BOT_TOKEN")  # required
+BOT_TOKEN     = os.getenv("BOT_TOKEN")  # required
 ADMIN_CHAT_ID = env_int("ADMIN_CHAT_ID")  # optional
-WEBHOOK_URL  = os.getenv("WEBHOOK_URL")   # optional
+WEBHOOK_URL   = os.getenv("WEBHOOK_URL")   # optional
 
 if not BOT_TOKEN:
     logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -76,8 +76,7 @@ SUPPORT_FILE = Path("support.jsonl")
 def save_jsonl(path: Path, obj: dict) -> int:
     """Append obj to JSONL with an auto ticket id (line number)."""
     path.touch(exist_ok=True)
-    # count lines for id
-    tid = 1
+    tid = 0
     try:
         with path.open("r", encoding="utf-8") as f:
             for tid, _ in enumerate(f, start=1):
@@ -110,7 +109,7 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
     "AECyberTV Kids": {
         "code": "kids",
         "price_aed": 70,
-        "trial_hours": 8,  # as requested
+        "trial_hours": 8,
         "details_en": "\n• Kids-safe channels\n• Cartoons & Educational shows\n• Works on 1 device\n",
         "details_ar": "\n• قنوات للأطفال\n• كرتون وبرامج تعليمية\n• يعمل على جهاز واحد\n",
         "payment_url": "https://buy.stripe.com/3cIbJ29I94yA92g2AV5kk04",
@@ -141,7 +140,7 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# ------------------------- OFFERS (unchanged behavior, just robust) -------------------------
+# ------------------------- OFFERS -------------------------
 def build_embedded_offers() -> List[Dict[str, Any]]:
     shared_cta = "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06"
     body_en = (
@@ -221,11 +220,7 @@ def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     return ups
 
 # ------------------------- STATE -------------------------
-# chat_id -> { lang, package, phone, awaiting_phone(bool), awaiting_phone_reason(str),
-#              awaiting_username(bool), awaiting_username_reason(str),
-#              trial_pkg, ... }
 USER_STATE: Dict[int, Dict[str, Any]] = {}
-
 PHONE_RE = re.compile(r"^\+?\d[\d\s\-()]{6,}$")
 
 def normalize_phone(s: str) -> str:
@@ -359,16 +354,16 @@ I18N = {
 
     # Trial
     "trial_pick": {
-        "ar": "🧪 اختر باقة للتجربة المجانية (مرة كل 30 يومًا لكل رقم):",
-        "en": "🧪 Choose a package for the free trial (once every 30 days per phone):",
+        "ar": "🧪 اختر باقة للتجربة المجانية (مرة كل 30 يومًا لكل رقم ولكل باقة):",
+        "en": "🧪 Choose a package for the free trial (once every 30 days per phone per package):",
     },
     "trial_recorded": {
         "ar": "✅ تم تسجيل طلب التجربة. سيتم التواصل معك لإرسال البيانات.",
         "en": "✅ Trial request recorded. We’ll contact you to send credentials.",
     },
     "trial_cooldown": {
-        "ar": "❗️ تم استخدام التجربة مؤخرًا لهذا الرقم. اطلب تجربة جديدة بعد ~{days} يومًا.",
-        "en": "❗️ A trial was used recently for this number. Please try again in ~{days} days.",
+        "ar": "❗️ تم استخدام تجربة باقة «{pkg}» مؤخرًا لهذا الرقم. اطلب تجربة جديدة بعد ~{days} يومًا.",
+        "en": "❗️ A trial for “{pkg}” was used recently for this number. Please try again in ~{days} days.",
     },
 
     # Support
@@ -433,7 +428,6 @@ def trial_packages_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
-    # simple list; you can expand later
     issues = [
         ("login", "🚪 Login/Activation"),
         ("buffer", "🌐 Buffering / Speed"),
@@ -441,8 +435,6 @@ def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
         ("billing", "💳 Billing / Payment"),
         ("other", "🧩 Other"),
     ]
-    lang = get_state(chat_id).get("lang", "ar")
-    # keep labels bilingual for now
     rows = [[InlineKeyboardButton(lbl, callback_data=f"support_issue|{code}")] for code, lbl in issues]
     rows.append([InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")])
     return InlineKeyboardMarkup(rows)
@@ -456,21 +448,28 @@ def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
 # ------------------------- HELPERS -------------------------
 async def safe_edit_or_send(query, context, chat_id: int, text: str,
                             kb, html: bool = False, no_preview: bool = False) -> None:
+    """Edits callback message OR sends new message. If kb is ReplyKeyboardMarkup, we ONLY send a new message (no edit)."""
     try:
-        await query.edit_message_text(
-            text, reply_markup=kb if isinstance(kb, InlineKeyboardMarkup) else None,
-            parse_mode="HTML" if html else None, disable_web_page_preview=no_preview,
-        )
         if isinstance(kb, ReplyKeyboardMarkup):
-            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb,
-                                           parse_mode="HTML" if html else None, disable_web_page_preview=no_preview)
+            # Avoid double prompt: send only once (no edit).
+            await context.bot.send_message(
+                chat_id=chat_id, text=text, reply_markup=kb,
+                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview
+            )
+        else:
+            await query.edit_message_text(
+                text, reply_markup=kb if isinstance(kb, InlineKeyboardMarkup) else None,
+                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview,
+            )
     except Exception as e:
-        logging.warning("edit_message_text failed (%s); sending new message.", e)
+        logging.warning("safe_edit_or_send fallback: %s", e)
         try:
-            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb,
-                                           parse_mode="HTML" if html else None, disable_web_page_preview=no_preview)
+            await context.bot.send_message(
+                chat_id=chat_id, text=text, reply_markup=kb,
+                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview
+            )
         except Exception as e2:
-            logging.error("send_message fallback failed: %s", e2)
+            logging.error("send_message failed: %s", e2)
 
 def pkg_details_for_lang(pkg_name: str, lang: str) -> str:
     pkg = PACKAGES.get(pkg_name)
@@ -490,36 +489,40 @@ def _fmt_offer(o: dict, lang: str) -> str:
     e_uae = _parse_iso(o["end_at"]).astimezone(DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     return f"• {title}\n  🕒 {s_uae} → {e_uae} (UAE)\n  🔗 {o.get('cta_url','')}"
 
+async def _send_phone_prompt(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    """Single, non-duplicated phone prompt."""
+    await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
+
 # ------------------------- FLOWS (post-phone continuation) -------------------------
 async def _post_phone_continuations(update: Update, context: ContextTypes.DEFAULT_TYPE, phone: str):
     chat_id = update.effective_chat.id
     st = get_state(chat_id)
     reason = st.get("awaiting_phone_reason")
 
-    # ---- SUBSCRIBE flow
+    # SUBSCRIBE
     if reason == "subscribe":
         await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
         return
 
-    # ---- OFFER flow
+    # OFFER
     if reason == "offer":
         await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
         return
 
-    # ---- RENEW flow: after phone we’re done (username already captured earlier)
+    # RENEW (username already captured)
     if reason == "renew":
         await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, awaiting_username=False, awaiting_username_reason=None)
         return
 
-    # ---- TRIAL flow
+    # TRIAL (per phone PER PACKAGE cooldown 30d)
     if reason == "trial":
-        # cooldown check (30 days per phone)
+        pkg = st.get("trial_pkg")
         last_ok = None
         for r in iter_jsonl(TRIALS_FILE):
-            if r.get("phone") == phone:
+            if r.get("phone") == phone and r.get("package") == pkg:
                 try:
                     when = datetime.fromisoformat(r.get("created_at"))
                 except Exception:
@@ -528,12 +531,11 @@ async def _post_phone_continuations(update: Update, context: ContextTypes.DEFAUL
                     last_ok = when
         if last_ok and (_now_uae() - last_ok) < timedelta(days=30):
             days_left = 30 - (_now_uae() - last_ok).days
-            msg = I18N["trial_cooldown"]["ar" if get_state(chat_id).get("lang", "ar")=="ar" else "en"].format(days=days_left)
+            msg = I18N["trial_cooldown"]["ar" if get_state(chat_id).get("lang", "ar") == "ar" else "en"].format(pkg=pkg, days=days_left)
             await update.message.reply_text(msg, reply_markup=main_menu_kb(chat_id))
             set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, trial_pkg=None)
             return
 
-        pkg = st.get("trial_pkg")
         hours = PACKAGES[pkg]["trial_hours"] if pkg in PACKAGES else 0
         tid = save_jsonl(TRIALS_FILE, {
             "tg_chat_id": chat_id,
@@ -556,7 +558,7 @@ async def _post_phone_continuations(update: Update, context: ContextTypes.DEFAUL
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, trial_pkg=None)
         return
 
-    # ---- SUPPORT flow (after /done we asked phone)
+    # SUPPORT
     if reason == "support":
         await update.message.reply_text(t(chat_id, "support_saved"), reply_markup=main_menu_kb(chat_id))
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
@@ -623,28 +625,27 @@ async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     st = get_state(chat_id)
     txt = (update.message.text or "").strip()
 
-    # --- Support text flow (take precedence) ---
+    # Support details flow
     if context.user_data.get("support_stage") == "await_details":
         context.user_data["support_details"] = txt
         context.user_data["support_stage"] = "await_optional_screenshot"
         await update.message.reply_text(t(chat_id, "support_detail_prompt"))
         return
 
-    # --- Username flow (renew only) ---
+    # Username flow (renew)
     if st.get("awaiting_username") and st.get("awaiting_username_reason") == "renew":
         set_state(chat_id, awaiting_username=False)
         save_customer(chat_id, update.effective_user, st.get("package"), st.get("phone"), extra={"username_for_renew": txt})
         await update.message.reply_text(t(chat_id, "username_saved"))
-        # Now we ask for phone
         set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="renew")
-        await update.message.reply_text(t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
+        await _send_phone_prompt(context, chat_id)
         return
 
-    # --- Phone capture (generic) ---
+    # Phone capture by text
     if st.get("awaiting_phone") and txt:
         if PHONE_RE.match(txt):
             phone = normalize_phone(txt)
-            set_state(chat_id, phone=phone)  # keep reason for continuation
+            set_state(chat_id, phone=phone)
             save_customer(chat_id, update.effective_user, st.get("package"), phone)
             if ADMIN_CHAT_ID:
                 try:
@@ -661,7 +662,6 @@ async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     logging.error("Admin notify (phone) failed: %s", e)
             await update.message.reply_text(t(chat_id, "phone_saved"), reply_markup=ReplyKeyboardRemove())
             await _post_phone_continuations(update, context, phone)
-            # hard clear
             set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
             return
         else:
@@ -669,7 +669,7 @@ async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             reply_markup=phone_request_kb(chat_id))
             return
 
-    # If no language set → ask language; else show menu
+    # Default: language or menu
     if "lang" not in st:
         await update.message.reply_text(t(chat_id, "pick_lang"), reply_markup=lang_kb())
     else:
@@ -702,10 +702,8 @@ async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Support optional screenshot
     chat_id = update.effective_chat.id
     if context.user_data.get("support_stage") == "await_optional_screenshot":
-        # store file_id(s)
         photos = update.message.photo or []
         if photos:
             best = photos[-1].file_id
@@ -714,7 +712,6 @@ async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
 async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # finalize support ticket; then ask phone
     chat_id = update.effective_chat.id
     if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
         tid = save_jsonl(SUPPORT_FILE, {
@@ -736,22 +733,20 @@ async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     f"Details: {context.user_data.get('support_details')}\n"
                     f"Photos: {len(pics)}")
             await context.bot.send_message(chat_id=int(ADMIN_CHAT_ID), text=text)
-            # if photos exist, send them
             if pics:
                 media = [InputMediaPhoto(p) for p in pics[:10]]
                 try:
                     await context.bot.send_media_group(chat_id=int(ADMIN_CHAT_ID), media=media)
                 except Exception:
                     pass
-        # clear context stages
+        # clear stages then ask phone
         context.user_data["support_stage"] = None
         context.user_data["support_details"] = None
         context.user_data["support_photos"] = []
         context.user_data["support_issue_code"] = None
 
-        # now ask for phone to follow up
         set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="support")
-        await update.message.reply_text(t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
+        await _send_phone_prompt(context, chat_id)
     else:
         await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
 
@@ -769,7 +764,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if lang not in ("ar", "en"):
             lang = "ar"
         set_state(chat_id, lang=lang, awaiting_phone=False, awaiting_phone_reason=None,
-                  awaiting_username=False, awaiting_username_reason=None)
+                  awaiting_username=False, awaiting_username_reason=None, flow=None, trial_pkg=None)
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
         return
 
@@ -777,14 +772,12 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "pick_lang"), lang_kb())
         return
 
-    # Home nav
     if data == "back_home":
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None,
-                  awaiting_username=False, awaiting_username_reason=None)
+                  awaiting_username=False, awaiting_username_reason=None, flow=None)
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
         return
 
-    # More info
     if data == "more_info":
         text = t(chat_id, "more_info_title") + "\n\n" + t(chat_id, "more_info_body")
         await safe_edit_or_send(q, context, chat_id, text, main_menu_kb(chat_id), no_preview=True)
@@ -804,7 +797,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Trial
     if data == "trial":
-        # ensure no stale phone wait
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "trial_pick"), trial_packages_kb())
         return
@@ -814,9 +806,9 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if pkg_name not in PACKAGES:
             await safe_edit_or_send(q, context, chat_id, "Package not found.", trial_packages_kb())
             return
-        # record choice and go straight to phone (no username)
         set_state(chat_id, trial_pkg=pkg_name, awaiting_phone=True, awaiting_phone_reason="trial")
-        await safe_edit_or_send(q, context, chat_id, t(chat_id, "phone_request"), phone_request_kb(chat_id))
+        # Single prompt (no duplicate)
+        await _send_phone_prompt(context, chat_id)
         return
 
     # Support
@@ -831,7 +823,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if data.startswith("support_issue|"):
         _, code = data.split("|", 1)
-        # Open ticket immediately (register issue)
         tid = save_jsonl(SUPPORT_FILE, {
             "tg_chat_id": chat_id,
             "tg_user_id": user.id,
@@ -854,7 +845,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                 InlineKeyboardMarkup([[InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]]))
         return
 
-    # Offers list
+    # Offers
     if data == "offers":
         acts = active_offers()
         if not acts:
@@ -928,14 +919,14 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(chat_id=chat_id,
                                        text=t(chat_id, "breadcrumb_paid").format(pkg="Offer", ts=ts))
         set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="offer")
-        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
+        await _send_phone_prompt(context, chat_id)
         if ADMIN_CHAT_ID:
             await context.bot.send_message(chat_id=int(ADMIN_CHAT_ID),
                                            text=(f"🆕 Offer I Paid (phone pending)\n"
                                                  f"User: @{user.username or 'N/A'} ({user.id})"))
         return
 
-    # Package selection (works for subscribe or renew depending on st["flow"])
+    # Package selection (subscribe/renew)
     if data.startswith("pkg|"):
         _, pkg_name = data.split("|", 1)
         if pkg_name not in PACKAGES:
@@ -946,7 +937,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "breadcrumb_sel").format(pkg=pkg_name, price=price))
         lang = get_state(chat_id).get("lang", "ar")
         details = pkg_details_for_lang(pkg_name, lang)
-        flow = st.get("flow", "subscribe")
+        flow = get_state(chat_id).get("flow", "subscribe")
         text = f"🛍️ <b>{pkg_name}</b>\n💰 <b>{price} AED</b>\n{details}\n{t(chat_id, 'terms')}"
         await safe_edit_or_send(q, context, chat_id, text, agree_kb(chat_id, pkg_name, flow), html=True)
         return
@@ -963,13 +954,11 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "breadcrumb_paid").format(pkg=pkg_name, ts=ts))
 
         if reason == "renew":
-            # ask username first
             set_state(chat_id, awaiting_username=True, awaiting_username_reason="renew")
             await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "ask_username"))
         else:
-            # subscribe path: ask phone directly
             set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="subscribe")
-            await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
+            await _send_phone_prompt(context, chat_id)
 
         if ADMIN_CHAT_ID:
             await context.bot.send_message(
