@@ -1,0 +1,17 @@
+services:
+- type: worker
+name: aecybertv-bot
+env: python
+region: frankfurt
+plan: starter
+buildCommand: |
+pip install -r requirements.txt
+startCommand: |
+python aecybertv_bot_full_with_features.py
+envVars:
+- key: BOT_TOKEN
+sync: false # set in Render dashboard
+- key: ADMIN_CHAT_ID
+sync: false # your Telegram user id (integer)
+- key: PHONE_HASH_SALT
+value: change-this-salt-long-random
