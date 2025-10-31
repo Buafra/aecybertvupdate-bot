@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-AECyberTV Telegram Sales Bot — Bilingual + Renew + Free Trial + Support
+AECyberTV Telegram Sales Bot — Bilingual + Renew + Free Trial + Support + Offers
 python-telegram-bot==21.4
 """
 
@@ -329,8 +329,8 @@ I18N = {
         "en": "🧾 Payment confirmation clicked\n• Package: {pkg}\n• Time: {ts}",
     },
     "phone_request": {
-        "ar": "📞 شارك رقم هاتفك للتواصل والتفعيل.\nاضغط (مشاركة رقمي) أو اكتب الرقم مع رمز الدولة (مثل +9715xxxxxxx).",
-        "en": "📞 Please share your phone number so we can contact you.\nTap (Share my number) or type it including country code (e.g., +9715xxxxxxx).",
+        "ar": "📞 شارك رقم هاتفك للتواصل.\nاضغط (مشاركة رقمي) أو اكتب الرقم مع رمز الدولة (مثل +9715xxxxxxx).",
+        "en": "📞 Please share your phone number.\nTap (Share my number) or type it including country code (e.g., +9715xxxxxxx).",
     },
     "btn_share_phone": {"ar": "📲 مشاركة رقمي", "en": "📲 Share my number"},
     "phone_saved": {"ar": "✅ تم حفظ رقمك. سنتواصل معك قريباً.", "en": "✅ Number saved. We’ll contact you soon."},
@@ -448,10 +448,9 @@ def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
 # ------------------------- HELPERS -------------------------
 async def safe_edit_or_send(query, context, chat_id: int, text: str,
                             kb, html: bool = False, no_preview: bool = False) -> None:
-    """Edits callback message OR sends new message. If kb is ReplyKeyboardMarkup, we ONLY send a new message (no edit)."""
+    """Edits callback message OR sends new message. If kb is ReplyKeyboardMarkup, send only a new message."""
     try:
         if isinstance(kb, ReplyKeyboardMarkup):
-            # Avoid double prompt: send only once (no edit).
             await context.bot.send_message(
                 chat_id=chat_id, text=text, reply_markup=kb,
                 parse_mode="HTML" if html else None, disable_web_page_preview=no_preview
@@ -822,6 +821,11 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("support_issue|"):
+        # FIX: avoid double "describe the issue" prompts
+        if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
+            await q.answer("Support ticket already open. Please describe the issue or send /done.")
+            return
+
         _, code = data.split("|", 1)
         tid = save_jsonl(SUPPORT_FILE, {
             "tg_chat_id": chat_id,
@@ -835,14 +839,19 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data["support_issue_code"] = code
         context.user_data["support_stage"] = "await_details"
 
+        # Remove old inline keyboard; then send ONE prompt as a fresh message
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "support_detail_prompt"))
+
         if ADMIN_CHAT_ID:
             await context.bot.send_message(
                 chat_id=int(ADMIN_CHAT_ID),
                 text=(f"🛟 SUPPORT OPENED (seed #{tid})\nIssue: {code}\n"
                       f"User: @{user.username or 'N/A'} ({user.id})")
             )
-        await safe_edit_or_send(q, context, chat_id, t(chat_id, "support_detail_prompt"),
-                                InlineKeyboardMarkup([[InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]]))
         return
 
     # Offers
