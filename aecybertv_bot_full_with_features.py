@@ -355,24 +355,30 @@ I18N = {
     },
     "more_info_body_compact": {
         "ar": (
-            "كل التطبيقات تستخدم رقم الخادم: 7765\n"
-            "All players use Server Number: 7765\n\n"
-            "🍏 iPlay — iPhone / iPad / Mac (قريبًا Apple TV)\n"
-            "أنسب لمستخدمي أجهزة Apple.\n\n"
-            "🤖 S Player — Android / TV / Firestick\n"
-            "بعد التثبيت اضغط شعار AECyberTV للاتصال.\n\n"
-            "💠 000 Player — iOS / Android / TV / Web\n"
-            "سريع وبسيط على كل الأجهزة."
+            "📺 تطبيقات AECyberTV (رقم الخادم: 7765)\n\n"
+            "🍏 iPlay\n"
+            "• يعمل على أجهزة آيفون / آيباد / ماك (لاحقًا Apple TV)\n"
+            "• الأنسب لمستخدمي أجهزة آبل\n\n"
+            "🤖 S Player\n"
+            "• يعمل على أجهزة أندرويد / التلفزيونات الذكية / Firestick\n"
+            "• بعد التثبيت اضغط على شعار AECyberTV للاتصال\n\n"
+            "💠 000 Player\n"
+            "• يعمل على أجهزة iOS / أندرويد / التلفزيونات الذكية / الويب\n"
+            "• سريع وبسيط على جميع الأجهزة\n\n"
+            "ℹ️ روابط التحميل متوفرة في قسم «🔗 روابط التحميل»"
         ),
         "en": (
-            "All players use Server Number: 7765\n"
-            "كل التطبيقات تستخدم رقم الخادم: 7765\n\n"
-            "🍏 iPlay — iPhone / iPad / Mac (Apple TV soon)\n"
-            "Great for Apple users.\n\n"
-            "🤖 S Player — Android / TV / Firestick\n"
-            "Tap the AECyberTV logo after install to connect.\n\n"
-            "💠 000 Player — iOS / Android / TV / Web\n"
-            "Fast & simple on all devices."
+            "📺 AECyberTV Players (Server: 7765)\n\n"
+            "🍏 iPlay\n"
+            "• Works on iPhone / iPad / Mac (Apple TV later)\n"
+            "• Best choice for Apple users\n\n"
+            "🤖 S Player\n"
+            "• Works on Android / Smart TVs / Firestick\n"
+            "• Tap the AECyberTV logo after installation to connect\n\n"
+            "💠 000 Player\n"
+            "• Works on iOS / Android / Smart TVs / Web\n"
+            "• Fast and simple across all devices\n\n"
+            "ℹ️ Download links available under “🔗 Download Links”"
         ),
     },
 
@@ -389,8 +395,8 @@ I18N = {
     # iPlay page
     "player_iplay_body": {
         "ar": (
-            "🍏 iPlay — iPhone / iPad / Mac (قريبًا Apple TV)\n"
-            "استخدم نفس بيانات AECyberTV. مثالي لمستخدمي Apple.\n\n"
+            "🍏 iPlay — يعمل على آيفون / آيباد / ماك (لاحقًا Apple TV)\n"
+            "استخدم نفس بيانات AECyberTV. مثالي لمستخدمي آبل.\n\n"
             "App Store\n"
             "https://apps.apple.com/us/app/iplay-hub/id6751518936"
         ),
@@ -405,7 +411,7 @@ I18N = {
     # S Player page
     "player_splayer_body": {
         "ar": (
-            "🤖 S Player — Android / TV / Firestick\n"
+            "🤖 S Player — يعمل على أندرويد / التلفزيونات الذكية / Firestick\n"
             "بعد التثبيت اضغط شعار AECyberTV للاتصال.\n\n"
             "Google Play\n"
             "https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
@@ -425,7 +431,7 @@ I18N = {
     # 000 Player page
     "player_000_body": {
         "ar": (
-            "💠 000 Player — iOS / Android / TV / Web\n"
+            "💠 000 Player — يعمل على iOS / أندرويد / التلفزيونات الذكية / الويب\n"
             "سريع وبسيط على كل الأجهزة. Fast & simple on all devices.\n\n"
             "iOS\n"
             "https://apps.apple.com/us/app/000-player/id1665441224\n\n"
@@ -488,7 +494,7 @@ I18N = {
         "ar": f"🎉 شكراً لاختيارك {BRAND}!",
         "en": f"🎉 Thank you for choosing {BRAND}!",
     },
-    "breadcrumb_sel": {"ar": "🧩 تم حفظ اختيارك: {pkg} ({price} दरهم)", "en": "🧩 Selection saved: {pkg} ({price} AED)"},
+    "breadcrumb_sel": {"ar": "🧩 تم حفظ اختيارك: {pkg} ({price} درهم)", "en": "🧩 Selection saved: {pkg} ({price} AED)"},
     "breadcrumb_agree": {"ar": "✅ وافق على المتابعة: {pkg}", "en": "✅ Agreed to proceed: {pkg}"},
     "breadcrumb_paid": {
         "ar": "🧾 تم الضغط على (دفعت)\n• الباقة: {pkg}\n• الوقت: {ts}",
@@ -1083,6 +1089,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lang = get_state(chat_id).get("lang", "ar")
         title = off["title_ar"] if lang == "ar" else off["title_en"]
         body  = off["body_ar"]  if lang == "ar" else off["body_en"]
+        # Add note that offers may change at any time (already in body)
         text = f"🛍️ <b>{title}</b>\n\n{body}\n\n{t(chat_id, 'terms')}\n\nPlease choose a package:"
         await safe_edit_or_send(q, context, chat_id, text, offer_packages_kb(idx), html=True)
         return
