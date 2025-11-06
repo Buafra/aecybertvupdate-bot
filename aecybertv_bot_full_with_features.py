@@ -159,6 +159,9 @@ CTA_DEFAULT: Dict[str, str] = {
 # ------------------------- OFFERS (NEW) -------------------------
 def build_embedded_offers() -> List[Dict[str, Any]]:
     """AECyberTV official offers schedule (2025–2026)."""
+    note_en = "ℹ️ Note: offers may change at any time."
+    note_ar = "ℹ️ ملاحظة: العروض قابلة للتغيير في أي وقت."
+
     body_en_common = (
         "🎬 Enjoy thousands of Live Channels, Movies, and Series!\n"
         "Available for all AECyberTV packages."
@@ -176,7 +179,7 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
 
     offers: List[Dict[str, Any]] = []
 
-    # 1) Early offer — active now (Nov 6 → Nov 30, 2025) — generic wording, not "ما قبل اليوم الوطني"
+    # 1) Current offer — active now (Nov 6 → Nov 30, 2025)
     s, e = _range(2025, 11, 6, 2025, 11, 30)
     offers.append({
         "id": "early_offer_nov2025",
@@ -189,7 +192,8 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Casual – 50 AED/year\n"
             "• Executive – 150 AED/year\n"
             "• Premium – 200 AED/year\n"
-            "• Kids – 50 AED/year"
+            "• Kids – 50 AED/year\n\n"
+            f"{note_en}"
         ),
         "body_ar": (
             f"{body_ar_common}\n\n"
@@ -198,13 +202,14 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• باقة الـ Casual – 50 درهم/سنة\n"
             "• باقة الـ Executive – 150 درهم/سنة\n"
             "• باقة الـ Premium – 200 درهم/سنة\n"
-            "• باقة الـ Kids – 50 درهم/سنة"
+            "• باقة الـ Kids – 50 درهم/سنة\n\n"
+            f"{note_ar}"
         ),
-        "cta_urls": CTA_DEFAULT,  # per-package
+        "cta_urls": CTA_DEFAULT,
         "start_at": s, "end_at": e, "priority": 100
     })
 
-    # 2) UAE National Day — Eid Al-Etihad (Dec 1–7, 2025)
+    # 2) UAE National Day — Dec 1–7, 2025
     s, e = _range(2025, 12, 1, 2025, 12, 7)
     offers.append({
         "id": "uae_national_day_2025",
@@ -217,7 +222,8 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Casual – 34.6 AED/year\n"
             "• Executive – 95 AED/year\n"
             "• Premium – 115 AED/year\n"
-            "• Kids – 32 AED/year"
+            "• Kids – 32 AED/year\n\n"
+            f"{note_en}"
         ),
         "body_ar": (
             f"{body_ar_common}\n\n"
@@ -226,13 +232,14 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• باقة الـ Casual – 34.6 درهم/سنة\n"
             "• باقة الـ Executive – 95 درهم/سنة\n"
             "• باقة الـ Premium – 115 درهم/سنة\n"
-            "• باقة الـ Kids – 32 درهم/سنة"
+            "• باقة الـ Kids – 32 درهم/سنة\n\n"
+            f"{note_ar}"
         ),
         "cta_urls": CTA_NATIONAL_DAY,
         "start_at": s, "end_at": e, "priority": 200
     })
 
-    # 3) Christmas & New Year (Dec 24, 2025 – Jan 5, 2026)
+    # 3) Christmas & New Year — Dec 24, 2025 – Jan 5, 2026
     s, e = _range(2025, 12, 24, 2026, 1, 5)
     offers.append({
         "id": "xmas_newyear_2025_2026",
@@ -245,7 +252,8 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Casual – 50 AED/year\n"
             "• Executive – 150 AED/year\n"
             "• Premium – 200 AED/year\n"
-            "• Kids – 50 AED/year"
+            "• Kids – 50 AED/year\n\n"
+            f"{note_en}"
         ),
         "body_ar": (
             f"{body_ar_common}\n\n"
@@ -254,7 +262,8 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• باقة الـ Casual – 50 درهم/سنة\n"
             "• باقة الـ Executive – 150 درهم/سنة\n"
             "• باقة الـ Premium – 200 درهم/سنة\n"
-            "• باقة الـ Kids – 50 درهم/سنة"
+            "• باقة الـ Kids – 50 درهم/سنة\n\n"
+            f"{note_ar}"
         ),
         "cta_urls": CTA_DEFAULT,
         "start_at": s, "end_at": e, "priority": 150
@@ -266,7 +275,7 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
 # In-memory offers list, rebuilt at startup and via /offer_reload
 OFFERS_ALL: List[Dict[str, Any]] = []
 
-# --- Offer query helpers (required by handlers) ---
+# --- Offer query helpers ---
 def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     if now is None:
         now = _utcnow()  # UTC
@@ -338,27 +347,105 @@ I18N = {
         "ar": f"مرحباً بك في {BRAND}!\n\nكيف نقدر نساعدك اليوم؟",
         "en": f"Welcome to {BRAND}!\n\nHow can we help you today?",
     },
-    "more_info_title": {"ar": "📥 طريقة المشاهدة باستخدام 000 Player", "en": "📥 How to Watch with 000 Player"},
+
+    # ===== Updated Players & Compatibility =====
+    "more_info_title": {
+        "ar": "📺 تطبيقات AECyberTV – الأجهزة المتوافقة | AECyberTV Players & Compatibility",
+        "en": "📺 AECyberTV Players & Compatibility | التطبيقات المتوافقة",
+    },
     "more_info_body": {
         "ar": (
-            "1) ثبّت تطبيق 000 Player:\n"
-            "   • iPhone/iPad: App Store\n"
-            "   • Android/TV: Google Play\n"
-            "   • Firestick/Android TV (Downloader): http://aftv.news/6913771\n"
-            "   • Web (PC, PlayStation, Xbox): https://my.splayer.in\n\n"
-            "2) أدخل رقم السيرفر: 7765\n"
-            "3) بعد الدفع والتفعيل، نرسل لك بيانات الدخول."
+            "يسعدنا أن نقدم لك ثلاثة تطبيقات موثوقة يمكنك من خلالها استخدام اشتراكك في AECyberTV.\n"
+            "جميع التطبيقات تعمل باستخدام رقم الخادم: 7765\n"
+            "We’re pleased to offer three reliable player options for your AECyberTV subscription.\n"
+            "All players use Server Number: 7765\n\n"
+            "🍏 iPlay\n\n"
+            "الأجهزة المتوافقة | Compatibility:\n\n"
+            "آيفون 📱 / iPhone\n\n"
+            "آيباد 💻 / iPad\n\n"
+            "ماك 💻 / Mac\n\n"
+            "(قريبًا على Apple TV 📺 / Coming soon on Apple TV)\n\n"
+            "رابط التحميل | Download:\n"
+            "App Store: https://apps.apple.com/us/app/iplay-hub/id6751518936\n\n"
+            "ملاحظات | Notes:\n"
+            "استخدم نفس بيانات الدخول الخاصة بـ AECyberTV.\n"
+            "Use your existing AECyberTV username and password.\n"
+            "مثالي لمستخدمي أجهزة آبل الذين يفضلون واجهة أنيقة وسلسة.\n"
+            "Perfect for Apple users who prefer a smooth, elegant experience.\n\n"
+            "🤖 S Player\n\n"
+            "الأجهزة المتوافقة | Compatibility:\n\n"
+            "هواتف أندرويد 📱 / Android Phones\n\n"
+            "أجهزة أندرويد اللوحية 💻 / Android Tablets\n\n"
+            "التلفزيونات الذكية 🖥️ / Android Smart TVs\n\n"
+            "أجهزة Firestick 🔥 / Firestick (via Downloader)\n\n"
+            "روابط التحميل | Download Links:\n"
+            "Google Play: https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
+            "Downloader: http://aftv.news/5653918\n\n"
+            "ملاحظات | Notes:\n"
+            "بعد التثبيت، اضغط على شعار AECyberTV داخل التطبيق للاتصال.\n"
+            "After installation, click the AECyberTV logo inside the app to connect.\n\n"
+            "💠 000 Player\n\n"
+            "الأجهزة المتوافقة | Compatibility:\n\n"
+            "آيفون 📱 / iPhone\n\n"
+            "هواتف أندرويد 🤖 / Android Phones\n\n"
+            "التلفزيونات الذكية 🖥️ / Smart TVs\n\n"
+            "أجهزة Firestick 🔥 / Firestick\n\n"
+            "المتصفحات 💻 / Web Browsers (https://my.splayer.in)\n\n"
+            "روابط التحميل | Download Links:\n"
+            "iOS: https://apps.apple.com/us/app/000-player/id1665441224\n\n"
+            "Android / Smart TV: https://000player.com/download\n\n"
+            "Downloader: http://aftv.news/6913771\n\n"
+            "ملاحظات | Notes:\n"
+            "سريع، بسيط، ومتوافق مع جميع الأجهزة.\n"
+            "Fast, simple, and reliable across all device types\n"
         ),
         "en": (
-            "1) Install 000 Player:\n"
-            "   • iPhone/iPad: App Store\n"
-            "   • Android/TV: Google Play\n"
-            "   • Firestick/Android TV (Downloader): http://aftv.news/6913771\n"
-            "   • Web (PC, PlayStation, Xbox): https://my.splayer.in\n\n"
-            "2) Enter Server Number: 7765\n"
-            "3) After payment & activation, we will send your login details."
+            "We’re pleased to offer three reliable player options for your AECyberTV subscription.\n"
+            "All players use Server Number: 7765\n"
+            "يسعدنا أن نقدم لك ثلاثة تطبيقات موثوقة يمكنك من خلالها استخدام اشتراكك في AECyberTV.\n"
+            "جميع التطبيقات تعمل باستخدام رقم الخادم: 7765\n\n"
+            "🍏 iPlay\n\n"
+            "Compatibility | الأجهزة المتوافقة:\n\n"
+            "iPhone 📱 / آيفون\n\n"
+            "iPad 💻 / آيباد\n\n"
+            "Mac 💻 / ماك\n\n"
+            "(Coming soon on Apple TV / قريبًا على Apple TV 📺)\n\n"
+            "Download | رابط التحميل:\n"
+            "App Store: https://apps.apple.com/us/app/iplay-hub/id6751518936\n\n"
+            "Notes | ملاحظات:\n"
+            "Use your existing AECyberTV username and password.\n"
+            "استخدم نفس بيانات الدخول الخاصة بـ AECyberTV.\n"
+            "Perfect for Apple users who prefer a smooth, elegant experience.\n"
+            "مثالي لمستخدمي أجهزة آبل الذين يفضلون واجهة أنيقة وسلسة.\n\n"
+            "🤖 S Player\n\n"
+            "Compatibility | الأجهزة المتوافقة:\n\n"
+            "Android Phones 📱 / هواتف أندرويد\n\n"
+            "Android Tablets 💻 / أجهزة أندرويد اللوحية\n\n"
+            "Android Smart TVs 🖥️ / التلفزيونات الذكية\n\n"
+            "Firestick 🔥 / أجهزة Firestick (via Downloader)\n\n"
+            "Download Links | روابط التحميل:\n"
+            "Google Play: https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
+            "Downloader: http://aftv.news/5653918\n\n"
+            "Notes | ملاحظات:\n"
+            "After installation, click the AECyberTV logo inside the app to connect.\n"
+            "بعد التثبيت، اضغط على شعار AECyberTV داخل التطبيق للاتصال.\n\n"
+            "💠 000 Player\n\n"
+            "Compatibility | الأجهزة المتوافقة:\n\n"
+            "iPhone 📱 / آيفون\n\n"
+            "Android Phones 🤖 / هواتف أندرويد\n\n"
+            "Smart TVs 🖥️ / التلفزيونات الذكية\n\n"
+            "Firestick 🔥 / أجهزة Firestick\n\n"
+            "Web Browsers 💻 (https://my.splayer.in) / المتصفحات\n\n"
+            "Download Links | روابط التحميل:\n"
+            "iOS: https://apps.apple.com/us/app/000-player/id1665441224\n\n"
+            "Android / Smart TV: https://000player.com/download\n\n"
+            "Downloader: http://aftv.news/6913771\n\n"
+            "Notes | ملاحظات:\n"
+            "Fast, simple, and reliable across all device types\n"
+            "سريع، بسيط، ومتوافق مع جميع الأجهزة.\n"
         ),
     },
+
     "btn_more_info": {"ar": "📋 معلومات", "en": "📋 More Info"},
     "btn_subscribe": {"ar": "💳 اشتراك", "en": "💳 Subscribe"},
     "btn_renew": {"ar": "♻️ تجديد", "en": "♻️ Renew"},
@@ -409,47 +496,40 @@ I18N = {
     "btn_share_phone": {"ar": "📲 مشاركة رقمي", "en": "📲 Share my number"},
     "phone_saved": {"ar": "✅ تم حفظ رقمك. سنتواصل معك قريباً.", "en": "✅ Number saved. We’ll contact you soon."},
 
-    # Offers UI texts (updated per your request)
+    # Offers UI texts
     "offers_title": {"ar": "🎁 العروض المتاحة الآن", "en": "🎁 Available offers now"},
-    "offers_none": {
-        "ar": "لا توجد عروض متاحة الآن",
-        "en": "no offer",
-    },
+    "offers_none": {"ar": "لا توجد عروض متاحة الآن", "en": "no offer"},
 
     # Renew / Username
     "ask_username": {
         "ar": "👤 اكتب اسم المستخدم (username) المستخدم في التطبيق للتجديد.",
         "en": "👤 Please type the account username you use in the player for renewal.",
     },
-    "username_saved": {
-        "ar": "✅ تم حفظ اسم المستخدم.",
-        "en": "✅ Username saved.",
-    },
+    "username_saved": {"ar": "✅ تم حفظ اسم المستخدم.", "en": "✅ Username saved."},
 
     # Trial
     "trial_pick": {
         "ar": "🧪 اختر باقة للتجربة المجانية (مرة كل 30 يومًا لكل رقم ولكل باقة):",
         "en": "🧪 Choose a package for the free trial (once every 30 days per phone per package):",
     },
-    "trial_recorded": {
-        "ar": "✅ تم تسجيل طلب التجربة. سيتم التواصل معك لإرسال البيانات.",
-        "en": "✅ Trial request recorded. We’ll contact you to send credentials.",
-    },
+    "trial_recorded": {"ar": "✅ تم تسجيل طلب التجربة. سيتم التواصل معك لإرسال البيانات.", "en": "✅ Trial request recorded. We’ll contact you to send credentials."},
     "trial_cooldown": {
         "ar": "❗️ تم استخدام تجربة باقة «{pkg}» مؤخرًا لهذا الرقم. اطلب تجربة جديدة بعد ~{days} يومًا.",
         "en": "❗️ A trial for “{pkg}” was used recently for this number. Please try again in ~{days} days.",
     },
 
-    # Support
+    # Support (Arabic & English labels)
     "support_pick": {"ar": "🛟 اختر نوع المشكلة:", "en": "🛟 Choose an issue:"},
+    "support_login": {"ar": "🚪 تسجيل الدخول/التفعيل", "en": "🚪 Login/Activation"},
+    "support_buffer": {"ar": "🌐 السرعة/التقطيع", "en": "🌐 Buffering / Speed"},
+    "support_channels": {"ar": "📺 القنوات المفقودة", "en": "📺 Missing Channel"},
+    "support_billing": {"ar": "💳 الفوترة/الدفع", "en": "💳 Billing / Payment"},
+    "support_other": {"ar": "🧩 أخرى", "en": "🧩 Other"},
     "support_detail_prompt": {
         "ar": "اشرح المشكلة بالتفصيل.\nيمكنك إرسال لقطة شاشة إن وجدت، أو أرسل /done للإرسال.",
         "en": "Describe the issue in detail.\nYou may send a screenshot if available, or send /done to submit.",
     },
-    "support_saved": {
-        "ar": "✅ تم تسجيل البلاغ وسنتواصل معك قريبًا.",
-        "en": "✅ Your support ticket is recorded. We will contact you soon.",
-    },
+    "support_saved": {"ar": "✅ تم تسجيل البلاغ وسنتواصل معك قريبًا.", "en": "✅ Your support ticket is recorded. We will contact you soon."},
 }
 
 def t(chat_id: int, key: str) -> str:
@@ -502,15 +582,12 @@ def trial_packages_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
-    issues = [
-        ("login", "🚪 Login/Activation"),
-        ("buffer", "🌐 Buffering / Speed"),
-        ("channels", "📺 Missing Channel"),
-        ("billing", "💳 Billing / Payment"),
-        ("other", "🧩 Other"),
-    ]
-    rows = [[InlineKeyboardButton(lbl, callback_data=f"support_issue|{code}")] for code, lbl in issues]
-    rows.append([InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")])
+    rows = [[InlineKeyboardButton(t(chat_id, "support_login"), callback_data="support_issue|login")],
+            [InlineKeyboardButton(t(chat_id, "support_buffer"), callback_data="support_issue|buffer")],
+            [InlineKeyboardButton(t(chat_id, "support_channels"), callback_data="support_issue|channels")],
+            [InlineKeyboardButton(t(chat_id, "support_billing"), callback_data="support_issue|billing")],
+            [InlineKeyboardButton(t(chat_id, "support_other"), callback_data="support_issue|other")],
+            [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]]
     return InlineKeyboardMarkup(rows)
 
 def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
@@ -897,14 +974,12 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Support
     if data == "support":
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-        context.user_data["support_stage"] = None
-        context.user_data["support_details"] = None
-        context.user_data["support_photos"] = []
-        context.user_data["support_issue_code"] = None
+        # Arabic/English labels shown based on t()
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "support_pick"), support_issues_kb(chat_id))
         return
 
     if data.startswith("support_issue|"):
+        # Avoid duplicate prompt
         if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
             await q.answer("Support ticket already open. Please describe the issue or send /done.")
             return
