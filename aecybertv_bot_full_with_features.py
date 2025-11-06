@@ -140,10 +140,29 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# ------------------------- OFFERS -------------------------
-# ------------------------- OFFERS -------------------------
+# Short keys used in offer package selection
+PKG_SHORT = ["Casual", "Executive", "Premium", "Kids"]
+
+# ------------------------- OFFER PAYMENT LINKS -------------------------
+# National Day (Dec 1–7, 2025)
+CTA_NATIONAL_DAY: Dict[str, str] = {
+    "Casual":   "https://buy.stripe.com/aFaaEYf2t9SU0vK7Vf5kk09",
+    "Executive":"https://buy.stripe.com/28EaEY07zghi5Q45N75kk0c",
+    "Kids":     "https://buy.stripe.com/9B6fZi4nP0ik1zO0sN5kk0b",
+    "Premium":  "https://buy.stripe.com/28EbJ26vXc12emA3EZ5kk0a",
+}
+
+# Christmas & New Year AND all other offers (e.g., Early Bird)
+CTA_DEFAULT: Dict[str, str] = {
+    "Casual":   "https://buy.stripe.com/cNi8wQ3jL1moa6k1wR5kk0g",
+    "Premium":  "https://buy.stripe.com/aFa00k7A1e9aces2AV5kk0f",
+    "Kids":     "https://buy.stripe.com/cNi3cw5rTc12baoejD5kk0e",
+    "Executive":"https://buy.stripe.com/8x200kbQh7KM3HW1wR5kk0d",
+}
+
+# ------------------------- OFFERS (NEW) -------------------------
 def build_embedded_offers() -> List[Dict[str, Any]]:
-    """AECyberTV official offers schedule (2025–2026)"""
+    """AECyberTV official offers schedule (2025–2026)."""
     body_en = (
         "🎬 Enjoy thousands of Live Channels, Movies, and Series!\n"
         "Available for all AECyberTV packages."
@@ -153,16 +172,15 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
         "العرض متوفر لجميع باقات AECyberTV."
     )
 
-    # Helper to format Dubai-local → UTC ISO timestamps
     def _range(y1, m1, d1, y2, m2, d2):
         return dubai_range_to_utc_iso(
             datetime(y1, m1, d1, 0, 0, 0, tzinfo=DUBAI_TZ),
             datetime(y2, m2, d2, 23, 59, 59, tzinfo=DUBAI_TZ),
         )
 
-    offers = []
+    offers: List[Dict[str, Any]] = []
 
-    # 1️⃣ Early Offer (from now until Dec 1)
+    # 1) Early Bird — active now (Nov 6 → Nov 30, 2025) — uses CTA_DEFAULT
     s, e = _range(2025, 11, 6, 2025, 11, 30)
     offers.append({
         "id": "early_offer_nov2025",
@@ -186,11 +204,11 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• بريميوم – 200 درهم/سنة\n"
             "• أطفال – 50 درهم/سنة"
         ),
-        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "cta_urls": CTA_DEFAULT,  # per-package
         "start_at": s, "end_at": e, "priority": 100
     })
 
-    # 2️⃣ UAE National Day (Dec 1–7)
+    # 2) UAE National Day — Eid Al-Etihad (Dec 1–7, 2025) — uses CTA_NATIONAL_DAY
     s, e = _range(2025, 12, 1, 2025, 12, 7)
     offers.append({
         "id": "uae_national_day_2025",
@@ -214,11 +232,11 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• بريميوم – 115 درهم/سنة\n"
             "• أطفال – 32 درهم/سنة"
         ),
-        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "cta_urls": CTA_NATIONAL_DAY,  # per-package
         "start_at": s, "end_at": e, "priority": 200
     })
 
-    # 3️⃣ Christmas & New Year (Dec 24–Jan 5)
+    # 3) Christmas & New Year (Dec 24, 2025 – Jan 5, 2026) — uses CTA_DEFAULT
     s, e = _range(2025, 12, 24, 2026, 1, 5)
     offers.append({
         "id": "xmas_newyear_2025_2026",
@@ -242,14 +260,42 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• بريميوم – 200 درهم/سنة\n"
             "• أطفال – 50 درهم/سنة"
         ),
-        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "cta_urls": CTA_DEFAULT,  # per-package
         "start_at": s, "end_at": e, "priority": 150
     })
 
-    return sorted(offers, key=lambda x: int(x.get("priority", 0)), reverse=True)
+    # Sort by priority desc, then start time asc
+    return sorted(offers, key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
 
+# In-memory offers list, rebuilt at startup and via /offer_reload
 OFFERS_ALL: List[Dict[str, Any]] = []
 
+# --- Offer query helpers (required by handlers) ---
+def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    acts: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
+                acts.append(o)
+        except Exception:
+            continue
+    acts.sort(key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
+    return acts
+
+def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    ups: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if now < _parse_iso(o["start_at"]):
+                ups.append(o)
+        except Exception:
+            continue
+    ups.sort(key=lambda x: x.get("start_at", ""))
+    return ups
 
 # ------------------------- STATE -------------------------
 USER_STATE: Dict[int, Dict[str, Any]] = {}
@@ -477,6 +523,18 @@ def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
         resize_keyboard=True, one_time_keyboard=True, input_field_placeholder="Tap to share, or type your number…"
     )
 
+# Offer package selection keyboard
+def offer_packages_kb(idx: int) -> InlineKeyboardMarkup:
+    # Buttons in a tidy 2x2 grid
+    rows = [
+        [InlineKeyboardButton("Casual", callback_data=f"offer_pkg|{idx}|Casual"),
+         InlineKeyboardButton("Executive", callback_data=f"offer_pkg|{idx}|Executive")],
+        [InlineKeyboardButton("Premium", callback_data=f"offer_pkg|{idx}|Premium"),
+         InlineKeyboardButton("Kids", callback_data=f"offer_pkg|{idx}|Kids")],
+        [InlineKeyboardButton("⬅️ Back", callback_data="offers")]
+    ]
+    return InlineKeyboardMarkup(rows)
+
 # ------------------------- HELPERS -------------------------
 async def safe_edit_or_send(query, context, chat_id: int, text: str,
                             kb, html: bool = False, no_preview: bool = False) -> None:
@@ -518,7 +576,7 @@ def _fmt_offer(o: dict, lang: str) -> str:
     title = o["title_ar"] if lang == "ar" else o["title_en"]
     s_uae = _parse_iso(o["start_at"]).astimezone(DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
     e_uae = _parse_iso(o["end_at"]).astimezone(DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    return f"• {title}\n  🕒 {s_uae} → {e_uae} (UAE)\n  🔗 {o.get('cta_url','')}"
+    return f"• {title}\n  🕒 {s_uae} → {e_uae} (UAE)"
 
 async def _send_phone_prompt(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     """Single, non-duplicated phone prompt."""
@@ -853,7 +911,7 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("support_issue|"):
-        # FIX: avoid double "describe the issue" prompts
+        # Avoid duplicate prompt
         if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
             await q.answer("Support ticket already open. Please describe the issue or send /done.")
             return
@@ -871,7 +929,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         context.user_data["support_issue_code"] = code
         context.user_data["support_stage"] = "await_details"
 
-        # Remove old inline keyboard; then send ONE prompt as a fresh message
         try:
             await q.edit_message_reply_markup(reply_markup=None)
         except Exception:
@@ -920,14 +977,50 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lang = get_state(chat_id).get("lang", "ar")
         title = off["title_ar"] if lang == "ar" else off["title_en"]
         body  = off["body_ar"]  if lang == "ar" else off["body_en"]
-        text = f"🛍️ <b>{title}</b>\n\n{body}\n\n{t(chat_id, 'terms')}"
-        await safe_edit_or_send(q, context, chat_id, text,
-                                InlineKeyboardMarkup([
-                                    [InlineKeyboardButton(t(chat_id, "btn_agree"), callback_data=f"offer_agree|{idx}")],
-                                    [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="offers")]
-                                ]), html=True)
+        text = f"🛍️ <b>{title}</b>\n\n{body}\n\n{t(chat_id, 'terms')}\n\nPlease choose a package:"
+        await safe_edit_or_send(q, context, chat_id, text, offer_packages_kb(idx), html=True)
         return
 
+    # NEW: user chooses which package inside the selected offer
+    if data.startswith("offer_pkg|"):
+        # format: offer_pkg|{idx}|{pkg_key}
+        parts = data.split("|", 2)
+        if len(parts) != 3:
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
+            return
+        _, sidx, pkg_key = parts
+        try:
+            idx = int(sidx)
+        except Exception:
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
+            return
+
+        acts = active_offers()
+        if idx < 0 or idx >= len(acts):
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
+            return
+
+        off = acts[idx]
+        ctas: Dict[str, str] = off.get("cta_urls", {})
+        url = ctas.get(pkg_key, "")
+
+        if not url:
+            await safe_edit_or_send(q, context, chat_id, "Payment link not available for this package.", offer_packages_kb(idx))
+            return
+
+        # Show payment screen with package-specific URL
+        await safe_edit_or_send(
+            q, context, chat_id, t(chat_id, "payment_instructions"),
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton(t(chat_id, "btn_pay_now"), url=url)],
+                [InlineKeyboardButton(t(chat_id, "btn_paid"), callback_data=f"offer_paid|{idx}|{pkg_key}")],
+                [InlineKeyboardButton("⬅️ Back", callback_data=f"offer_act|{idx}")]
+            ]),
+            no_preview=True
+        )
+        return
+
+    # Back-compat: if old flow sends offer_agree, route to package picker
     if data.startswith("offer_agree|"):
         _, sidx = data.split("|", 1)
         try:
@@ -935,36 +1028,37 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
             return
-        acts = active_offers()
-        url = (acts[idx].get("cta_url") or "").strip() if 0 <= idx < len(acts) else ""
-        await safe_edit_or_send(q, context, chat_id, t(chat_id, "payment_instructions"),
-                                InlineKeyboardMarkup([
-                                    [InlineKeyboardButton(t(chat_id, "btn_pay_now"), url=url)],
-                                    [InlineKeyboardButton(t(chat_id, "btn_paid"), callback_data=f"offer_paid|{idx}")],
-                                    [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="offers")]
-                                ]), no_preview=True)
+        await safe_edit_or_send(q, context, chat_id, "Choose a package:", offer_packages_kb(idx))
         return
 
     if data.startswith("offer_paid|"):
-        _, sidx = data.split("|", 1)
-        try:
-            idx = int(sidx)
-        except Exception:
+        # formats:
+        #   offer_paid|{idx}            (old)
+        #   offer_paid|{idx}|{pkg_key}  (new)
+        parts = data.split("|")
+        if len(parts) not in (2, 3):
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
             return
+
+        idx = int(parts[1]) if parts[1].isdigit() else -1
+        pkg_key = parts[2] if len(parts) == 3 else "Offer"
+
         acts = active_offers()
         if idx < 0 or idx >= len(acts):
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
             return
+
         ts = _now_uae().strftime("%Y-%m-%d %H:%M:%S")
         await context.bot.send_message(chat_id=chat_id,
-                                       text=t(chat_id, "breadcrumb_paid").format(pkg="Offer", ts=ts))
+                                       text=t(chat_id, "breadcrumb_paid").format(pkg=pkg_key, ts=ts))
         set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="offer")
         await _send_phone_prompt(context, chat_id)
         if ADMIN_CHAT_ID:
             await context.bot.send_message(chat_id=int(ADMIN_CHAT_ID),
                                            text=(f"🆕 Offer I Paid (phone pending)\n"
-                                                 f"User: @{user.username or 'N/A'} ({user.id})"))
+                                                 f"User: @{user.username or 'N/A'} ({user.id})\n"
+                                                 f"Offer index: {idx}\n"
+                                                 f"Package: {pkg_key}"))
         return
 
     # Package selection (subscribe/renew)
