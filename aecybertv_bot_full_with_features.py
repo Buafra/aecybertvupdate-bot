@@ -140,9 +140,6 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# Short keys used in offer package selection
-PKG_SHORT = ["Casual", "Executive", "Premium", "Kids"]
-
 # ------------------------- OFFER PAYMENT LINKS -------------------------
 # National Day (Dec 1–7, 2025)
 CTA_NATIONAL_DAY: Dict[str, str] = {
@@ -151,8 +148,7 @@ CTA_NATIONAL_DAY: Dict[str, str] = {
     "Kids":     "https://buy.stripe.com/9B6fZi4nP0ik1zO0sN5kk0b",
     "Premium":  "https://buy.stripe.com/28EbJ26vXc12emA3EZ5kk0a",
 }
-
-# Christmas & New Year AND all other offers (e.g., Early Bird)
+# Christmas & New Year AND other offers (e.g., Early Bird)
 CTA_DEFAULT: Dict[str, str] = {
     "Casual":   "https://buy.stripe.com/cNi8wQ3jL1moa6k1wR5kk0g",
     "Premium":  "https://buy.stripe.com/aFa00k7A1e9aces2AV5kk0f",
@@ -163,11 +159,11 @@ CTA_DEFAULT: Dict[str, str] = {
 # ------------------------- OFFERS (NEW) -------------------------
 def build_embedded_offers() -> List[Dict[str, Any]]:
     """AECyberTV official offers schedule (2025–2026)."""
-    body_en = (
+    body_en_common = (
         "🎬 Enjoy thousands of Live Channels, Movies, and Series!\n"
         "Available for all AECyberTV packages."
     )
-    body_ar = (
+    body_ar_common = (
         "🎬 استمتع بآلاف القنوات والأفلام والمسلسلات!\n"
         "العرض متوفر لجميع باقات AECyberTV."
     )
@@ -180,14 +176,14 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
 
     offers: List[Dict[str, Any]] = []
 
-    # 1) Early Bird — active now (Nov 6 → Nov 30, 2025) — uses CTA_DEFAULT
+    # 1) Early offer — active now (Nov 6 → Nov 30, 2025) — generic wording, not "ما قبل اليوم الوطني"
     s, e = _range(2025, 11, 6, 2025, 11, 30)
     offers.append({
         "id": "early_offer_nov2025",
-        "title_en": "🕐 Early Bird Offer — Until UAE National Day",
-        "title_ar": "🕐 عرض ما قبل اليوم الوطني",
+        "title_en": "🕐 Available offers now",
+        "title_ar": "🕐 العروض المتاحة الآن",
         "body_en": (
-            f"{body_en}\n\n"
+            f"{body_en_common}\n\n"
             "📅 Valid until 30 Nov 2025\n\n"
             "💰 Prices:\n"
             "• Casual – 50 AED/year\n"
@@ -196,26 +192,26 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Kids – 50 AED/year"
         ),
         "body_ar": (
-            f"{body_ar}\n\n"
+            f"{body_ar_common}\n\n"
             "📅 ساري حتى 30 نوفمبر 2025\n\n"
             "💰 الأسعار:\n"
-            "• عادي – 50 درهم/سنة\n"
-            "• تنفيذي – 150 درهم/سنة\n"
-            "• بريميوم – 200 درهم/سنة\n"
-            "• أطفال – 50 درهم/سنة"
+            "• باقة الـ Casual – 50 درهم/سنة\n"
+            "• باقة الـ Executive – 150 درهم/سنة\n"
+            "• باقة الـ Premium – 200 درهم/سنة\n"
+            "• باقة الـ Kids – 50 درهم/سنة"
         ),
         "cta_urls": CTA_DEFAULT,  # per-package
         "start_at": s, "end_at": e, "priority": 100
     })
 
-    # 2) UAE National Day — Eid Al-Etihad (Dec 1–7, 2025) — uses CTA_NATIONAL_DAY
+    # 2) UAE National Day — Eid Al-Etihad (Dec 1–7, 2025)
     s, e = _range(2025, 12, 1, 2025, 12, 7)
     offers.append({
         "id": "uae_national_day_2025",
-        "title_en": "🇦🇪 UAE National Day — Eid Al-Etihad 54% OFF",
-        "title_ar": "🇦🇪 عرض اليوم الوطني — عيد الاتحاد خصم 54%",
+        "title_en": "🇦🇪 UAE National Day — Available offers now",
+        "title_ar": "🇦🇪 اليوم الوطني — العروض المتاحة الآن",
         "body_en": (
-            f"{body_en}\n\n"
+            f"{body_en_common}\n\n"
             "📅 1–7 December 2025\n\n"
             "💰 Discounted Prices:\n"
             "• Casual – 34.6 AED/year\n"
@@ -224,26 +220,26 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Kids – 32 AED/year"
         ),
         "body_ar": (
-            f"{body_ar}\n\n"
+            f"{body_ar_common}\n\n"
             "📅 من 1 إلى 7 ديسمبر 2025\n\n"
             "💰 الأسعار بعد الخصم:\n"
-            "• عادي – 34.6 درهم/سنة\n"
-            "• تنفيذي – 95 درهم/سنة\n"
-            "• بريميوم – 115 درهم/سنة\n"
-            "• أطفال – 32 درهم/سنة"
+            "• باقة الـ Casual – 34.6 درهم/سنة\n"
+            "• باقة الـ Executive – 95 درهم/سنة\n"
+            "• باقة الـ Premium – 115 درهم/سنة\n"
+            "• باقة الـ Kids – 32 درهم/سنة"
         ),
-        "cta_urls": CTA_NATIONAL_DAY,  # per-package
+        "cta_urls": CTA_NATIONAL_DAY,
         "start_at": s, "end_at": e, "priority": 200
     })
 
-    # 3) Christmas & New Year (Dec 24, 2025 – Jan 5, 2026) — uses CTA_DEFAULT
+    # 3) Christmas & New Year (Dec 24, 2025 – Jan 5, 2026)
     s, e = _range(2025, 12, 24, 2026, 1, 5)
     offers.append({
         "id": "xmas_newyear_2025_2026",
-        "title_en": "🎄 Christmas & New Year Offer",
-        "title_ar": "🎄 عرض الكريسماس ورأس السنة",
+        "title_en": "🎄 Christmas & New Year — Available offers now",
+        "title_ar": "🎄 الكريسماس ورأس السنة — العروض المتاحة الآن",
         "body_en": (
-            f"{body_en}\n\n"
+            f"{body_en_common}\n\n"
             "📅 24 Dec 2025 – 5 Jan 2026\n\n"
             "💰 Prices:\n"
             "• Casual – 50 AED/year\n"
@@ -252,15 +248,15 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
             "• Kids – 50 AED/year"
         ),
         "body_ar": (
-            f"{body_ar}\n\n"
+            f"{body_ar_common}\n\n"
             "📅 من 24 ديسمبر 2025 حتى 5 يناير 2026\n\n"
             "💰 الأسعار:\n"
-            "• عادي – 50 درهم/سنة\n"
-            "• تنفيذي – 150 درهم/سنة\n"
-            "• بريميوم – 200 درهم/سنة\n"
-            "• أطفال – 50 درهم/سنة"
+            "• باقة الـ Casual – 50 درهم/سنة\n"
+            "• باقة الـ Executive – 150 درهم/سنة\n"
+            "• باقة الـ Premium – 200 درهم/سنة\n"
+            "• باقة الـ Kids – 50 درهم/سنة"
         ),
-        "cta_urls": CTA_DEFAULT,  # per-package
+        "cta_urls": CTA_DEFAULT,
         "start_at": s, "end_at": e, "priority": 150
     })
 
@@ -413,11 +409,11 @@ I18N = {
     "btn_share_phone": {"ar": "📲 مشاركة رقمي", "en": "📲 Share my number"},
     "phone_saved": {"ar": "✅ تم حفظ رقمك. سنتواصل معك قريباً.", "en": "✅ Number saved. We’ll contact you soon."},
 
-    # Offers
-    "offers_title": {"ar": "🎁 العروض الحالية", "en": "🎁 Current Offers"},
+    # Offers UI texts (updated per your request)
+    "offers_title": {"ar": "🎁 العروض المتاحة الآن", "en": "🎁 Available offers now"},
     "offers_none": {
-        "ar": "لا توجد عروض حالياً. راجعنا لاحقاً 🌟",
-        "en": "No offers right now. Check back soon 🌟",
+        "ar": "لا توجد عروض متاحة الآن",
+        "en": "no offer",
     },
 
     # Renew / Username
@@ -525,7 +521,6 @@ def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
 
 # Offer package selection keyboard
 def offer_packages_kb(idx: int) -> InlineKeyboardMarkup:
-    # Buttons in a tidy 2x2 grid
     rows = [
         [InlineKeyboardButton("Casual", callback_data=f"offer_pkg|{idx}|Casual"),
          InlineKeyboardButton("Executive", callback_data=f"offer_pkg|{idx}|Executive")],
@@ -677,9 +672,9 @@ async def offers_now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     acts = active_offers()
     if not acts:
-        await update.message.reply_text("No active offers.")
+        await update.message.reply_text("no offer")
         return
-    lines = ["Active offers:"]
+    lines = ["Available offers now:"]
     for o in acts:
         lines.append(_fmt_offer(o, get_state(update.effective_chat.id).get("lang","ar")))
     await update.message.reply_text("\n".join(lines))
@@ -690,7 +685,7 @@ async def upcoming_offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     ups = upcoming_offers()
     if not ups:
-        await update.message.reply_text("No upcoming offers.")
+        await update.message.reply_text("no offer")
         return
     lines = ["Upcoming offers:"]
     for o in ups:
@@ -896,7 +891,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await safe_edit_or_send(q, context, chat_id, "Package not found.", trial_packages_kb())
             return
         set_state(chat_id, trial_pkg=pkg_name, awaiting_phone=True, awaiting_phone_reason="trial")
-        # Single prompt (no duplicate)
         await _send_phone_prompt(context, chat_id)
         return
 
@@ -911,7 +905,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("support_issue|"):
-        # Avoid duplicate prompt
         if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
             await q.answer("Support ticket already open. Please describe the issue or send /done.")
             return
@@ -981,9 +974,8 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await safe_edit_or_send(q, context, chat_id, text, offer_packages_kb(idx), html=True)
         return
 
-    # NEW: user chooses which package inside the selected offer
+    # user chooses which package inside the selected offer
     if data.startswith("offer_pkg|"):
-        # format: offer_pkg|{idx}|{pkg_key}
         parts = data.split("|", 2)
         if len(parts) != 3:
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
@@ -1008,7 +1000,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await safe_edit_or_send(q, context, chat_id, "Payment link not available for this package.", offer_packages_kb(idx))
             return
 
-        # Show payment screen with package-specific URL
         await safe_edit_or_send(
             q, context, chat_id, t(chat_id, "payment_instructions"),
             InlineKeyboardMarkup([
@@ -1032,9 +1023,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if data.startswith("offer_paid|"):
-        # formats:
-        #   offer_paid|{idx}            (old)
-        #   offer_paid|{idx}|{pkg_key}  (new)
         parts = data.split("|")
         if len(parts) not in (2, 3):
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
