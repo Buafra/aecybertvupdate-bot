@@ -148,7 +148,7 @@ CTA_NATIONAL_DAY: Dict[str, str] = {
     "Kids":     "https://buy.stripe.com/9B6fZi4nP0ik1zO0sN5kk0b",
     "Premium":  "https://buy.stripe.com/28EbJ26vXc12emA3EZ5kk0a",
 }
-# Christmas & New Year AND other offers (e.g., Early Bird)
+# Christmas & New Year and other offers
 CTA_DEFAULT: Dict[str, str] = {
     "Casual":   "https://buy.stripe.com/cNi8wQ3jL1moa6k1wR5kk0g",
     "Premium":  "https://buy.stripe.com/aFa00k7A1e9aces2AV5kk0f",
@@ -348,104 +348,109 @@ I18N = {
         "en": f"Welcome to {BRAND}!\n\nHow can we help you today?",
     },
 
-    # ===== Updated Players & Compatibility =====
+    # ===== Compact Players & Compatibility (Summary) =====
     "more_info_title": {
-        "ar": "📺 تطبيقات AECyberTV – الأجهزة المتوافقة | AECyberTV Players & Compatibility",
-        "en": "📺 AECyberTV Players & Compatibility | التطبيقات المتوافقة",
+        "ar": "📺 تطبيقات AECyberTV | AECyberTV Players",
+        "en": "📺 AECyberTV Players | تطبيقات AECyberTV",
     },
-    "more_info_body": {
+    "more_info_body_compact": {
         "ar": (
-            "يسعدنا أن نقدم لك ثلاثة تطبيقات موثوقة يمكنك من خلالها استخدام اشتراكك في AECyberTV.\n"
-            "جميع التطبيقات تعمل باستخدام رقم الخادم: 7765\n"
-            "We’re pleased to offer three reliable player options for your AECyberTV subscription.\n"
+            "كل التطبيقات تستخدم رقم الخادم: 7765\n"
             "All players use Server Number: 7765\n\n"
-            "🍏 iPlay\n\n"
-            "الأجهزة المتوافقة | Compatibility:\n\n"
-            "آيفون 📱 / iPhone\n\n"
-            "آيباد 💻 / iPad\n\n"
-            "ماك 💻 / Mac\n\n"
-            "(قريبًا على Apple TV 📺 / Coming soon on Apple TV)\n\n"
-            "رابط التحميل | Download:\n"
-            "App Store: https://apps.apple.com/us/app/iplay-hub/id6751518936\n\n"
-            "ملاحظات | Notes:\n"
-            "استخدم نفس بيانات الدخول الخاصة بـ AECyberTV.\n"
-            "Use your existing AECyberTV username and password.\n"
-            "مثالي لمستخدمي أجهزة آبل الذين يفضلون واجهة أنيقة وسلسة.\n"
-            "Perfect for Apple users who prefer a smooth, elegant experience.\n\n"
-            "🤖 S Player\n\n"
-            "الأجهزة المتوافقة | Compatibility:\n\n"
-            "هواتف أندرويد 📱 / Android Phones\n\n"
-            "أجهزة أندرويد اللوحية 💻 / Android Tablets\n\n"
-            "التلفزيونات الذكية 🖥️ / Android Smart TVs\n\n"
-            "أجهزة Firestick 🔥 / Firestick (via Downloader)\n\n"
-            "روابط التحميل | Download Links:\n"
-            "Google Play: https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
-            "Downloader: http://aftv.news/5653918\n\n"
-            "ملاحظات | Notes:\n"
-            "بعد التثبيت، اضغط على شعار AECyberTV داخل التطبيق للاتصال.\n"
-            "After installation, click the AECyberTV logo inside the app to connect.\n\n"
-            "💠 000 Player\n\n"
-            "الأجهزة المتوافقة | Compatibility:\n\n"
-            "آيفون 📱 / iPhone\n\n"
-            "هواتف أندرويد 🤖 / Android Phones\n\n"
-            "التلفزيونات الذكية 🖥️ / Smart TVs\n\n"
-            "أجهزة Firestick 🔥 / Firestick\n\n"
-            "المتصفحات 💻 / Web Browsers (https://my.splayer.in)\n\n"
-            "روابط التحميل | Download Links:\n"
-            "iOS: https://apps.apple.com/us/app/000-player/id1665441224\n\n"
-            "Android / Smart TV: https://000player.com/download\n\n"
-            "Downloader: http://aftv.news/6913771\n\n"
-            "ملاحظات | Notes:\n"
-            "سريع، بسيط، ومتوافق مع جميع الأجهزة.\n"
-            "Fast, simple, and reliable across all device types\n"
+            "🍏 iPlay — iPhone / iPad / Mac (قريبًا Apple TV)\n"
+            "أنسب لمستخدمي أجهزة Apple.\n\n"
+            "🤖 S Player — Android / TV / Firestick\n"
+            "بعد التثبيت اضغط شعار AECyberTV للاتصال.\n\n"
+            "💠 000 Player — iOS / Android / TV / Web\n"
+            "سريع وبسيط على كل الأجهزة."
         ),
         "en": (
-            "We’re pleased to offer three reliable player options for your AECyberTV subscription.\n"
             "All players use Server Number: 7765\n"
-            "يسعدنا أن نقدم لك ثلاثة تطبيقات موثوقة يمكنك من خلالها استخدام اشتراكك في AECyberTV.\n"
-            "جميع التطبيقات تعمل باستخدام رقم الخادم: 7765\n\n"
-            "🍏 iPlay\n\n"
-            "Compatibility | الأجهزة المتوافقة:\n\n"
-            "iPhone 📱 / آيفون\n\n"
-            "iPad 💻 / آيباد\n\n"
-            "Mac 💻 / ماك\n\n"
-            "(Coming soon on Apple TV / قريبًا على Apple TV 📺)\n\n"
-            "Download | رابط التحميل:\n"
-            "App Store: https://apps.apple.com/us/app/iplay-hub/id6751518936\n\n"
-            "Notes | ملاحظات:\n"
-            "Use your existing AECyberTV username and password.\n"
-            "استخدم نفس بيانات الدخول الخاصة بـ AECyberTV.\n"
-            "Perfect for Apple users who prefer a smooth, elegant experience.\n"
-            "مثالي لمستخدمي أجهزة آبل الذين يفضلون واجهة أنيقة وسلسة.\n\n"
-            "🤖 S Player\n\n"
-            "Compatibility | الأجهزة المتوافقة:\n\n"
-            "Android Phones 📱 / هواتف أندرويد\n\n"
-            "Android Tablets 💻 / أجهزة أندرويد اللوحية\n\n"
-            "Android Smart TVs 🖥️ / التلفزيونات الذكية\n\n"
-            "Firestick 🔥 / أجهزة Firestick (via Downloader)\n\n"
-            "Download Links | روابط التحميل:\n"
-            "Google Play: https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
-            "Downloader: http://aftv.news/5653918\n\n"
-            "Notes | ملاحظات:\n"
-            "After installation, click the AECyberTV logo inside the app to connect.\n"
-            "بعد التثبيت، اضغط على شعار AECyberTV داخل التطبيق للاتصال.\n\n"
-            "💠 000 Player\n\n"
-            "Compatibility | الأجهزة المتوافقة:\n\n"
-            "iPhone 📱 / آيفون\n\n"
-            "Android Phones 🤖 / هواتف أندرويد\n\n"
-            "Smart TVs 🖥️ / التلفزيونات الذكية\n\n"
-            "Firestick 🔥 / أجهزة Firestick\n\n"
-            "Web Browsers 💻 (https://my.splayer.in) / المتصفحات\n\n"
-            "Download Links | روابط التحميل:\n"
-            "iOS: https://apps.apple.com/us/app/000-player/id1665441224\n\n"
-            "Android / Smart TV: https://000player.com/download\n\n"
-            "Downloader: http://aftv.news/6913771\n\n"
-            "Notes | ملاحظات:\n"
-            "Fast, simple, and reliable across all device types\n"
-            "سريع، بسيط، ومتوافق مع جميع الأجهزة.\n"
+            "كل التطبيقات تستخدم رقم الخادم: 7765\n\n"
+            "🍏 iPlay — iPhone / iPad / Mac (Apple TV soon)\n"
+            "Great for Apple users.\n\n"
+            "🤖 S Player — Android / TV / Firestick\n"
+            "Tap the AECyberTV logo after install to connect.\n\n"
+            "💠 000 Player — iOS / Android / TV / Web\n"
+            "Fast & simple on all devices."
         ),
     },
 
+    # ===== Download Links menu + per-player pages =====
+    "btn_players_links": {"ar": "🔗 روابط التحميل", "en": "🔗 Download Links"},
+    "players_links_title": {
+        "ar": "🔗 روابط التحميل | Download Links\nاختر التطبيق لرؤية الوصف والروابط:",
+        "en": "🔗 Download Links | روابط التحميل\nChoose a player to view description & links:",
+    },
+    "btn_player_iplay": {"ar": "🍏 iPlay", "en": "🍏 iPlay"},
+    "btn_player_splayer": {"ar": "🤖 S Player", "en": "🤖 S Player"},
+    "btn_player_000": {"ar": "💠 000 Player", "en": "💠 000 Player"},
+
+    # iPlay page
+    "player_iplay_body": {
+        "ar": (
+            "🍏 iPlay — iPhone / iPad / Mac (قريبًا Apple TV)\n"
+            "استخدم نفس بيانات AECyberTV. مثالي لمستخدمي Apple.\n\n"
+            "App Store\n"
+            "https://apps.apple.com/us/app/iplay-hub/id6751518936"
+        ),
+        "en": (
+            "🍏 iPlay — iPhone / iPad / Mac (Apple TV soon)\n"
+            "Use your AECyberTV credentials. Great for Apple users.\n\n"
+            "App Store\n"
+            "https://apps.apple.com/us/app/iplay-hub/id6751518936"
+        ),
+    },
+
+    # S Player page
+    "player_splayer_body": {
+        "ar": (
+            "🤖 S Player — Android / TV / Firestick\n"
+            "بعد التثبيت اضغط شعار AECyberTV للاتصال.\n\n"
+            "Google Play\n"
+            "https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
+            "Downloader (Firestick)\n"
+            "http://aftv.news/5653918"
+        ),
+        "en": (
+            "🤖 S Player — Android / TV / Firestick\n"
+            "Click the AECyberTV logo inside the app to connect.\n\n"
+            "Google Play\n"
+            "https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
+            "Downloader (Firestick)\n"
+            "http://aftv.news/5653918"
+        ),
+    },
+
+    # 000 Player page
+    "player_000_body": {
+        "ar": (
+            "💠 000 Player — iOS / Android / TV / Web\n"
+            "سريع وبسيط على كل الأجهزة. Fast & simple on all devices.\n\n"
+            "iOS\n"
+            "https://apps.apple.com/us/app/000-player/id1665441224\n\n"
+            "Android / Smart TV\n"
+            "https://000player.com/download\n\n"
+            "Downloader (Firestick)\n"
+            "http://aftv.news/6913771\n\n"
+            "Web\n"
+            "https://my.splayer.in"
+        ),
+        "en": (
+            "💠 000 Player — iOS / Android / TV / Web\n"
+            "Fast & simple on all devices. سريع وبسيط على كل الأجهزة.\n\n"
+            "iOS\n"
+            "https://apps.apple.com/us/app/000-player/id1665441224\n\n"
+            "Android / Smart TV\n"
+            "https://000player.com/download\n\n"
+            "Downloader (Firestick)\n"
+            "http://aftv.news/6913771\n\n"
+            "Web\n"
+            "https://my.splayer.in"
+        ),
+    },
+
+    # Common UI
     "btn_more_info": {"ar": "📋 معلومات", "en": "📋 More Info"},
     "btn_subscribe": {"ar": "💳 اشتراك", "en": "💳 Subscribe"},
     "btn_renew": {"ar": "♻️ تجديد", "en": "♻️ Renew"},
@@ -483,11 +488,12 @@ I18N = {
         "ar": f"🎉 شكراً لاختيارك {BRAND}!",
         "en": f"🎉 Thank you for choosing {BRAND}!",
     },
-    "breadcrumb_sel": {"ar": "🧩 تم حفظ اختيارك: {pkg} ({price} درهم)", "en": "🧩 Selection saved: {pkg} ({price} AED)"},
+    "breadcrumb_sel": {"ar": "🧩 تم حفظ اختيارك: {pkg} ({price} दरهم)", "en": "🧩 Selection saved: {pkg} ({price} AED)"},
     "breadcrumb_agree": {"ar": "✅ وافق على المتابعة: {pkg}", "en": "✅ Agreed to proceed: {pkg}"},
     "breadcrumb_paid": {
         "ar": "🧾 تم الضغط على (دفعت)\n• الباقة: {pkg}\n• الوقت: {ts}",
         "en": "🧾 Payment confirmation clicked\n• Package: {pkg}\n• Time: {ts}",
+        "en_short": "🧾 I Paid • {pkg} • {ts}",
     },
     "phone_request": {
         "ar": "📞 شارك رقم هاتفك للتواصل.\nاضغط (مشاركة رقمي) أو اكتب الرقم مع رمز الدولة (مثل +9715xxxxxxx).",
@@ -556,9 +562,23 @@ def main_menu_kb(chat_id: int) -> InlineKeyboardMarkup:
          InlineKeyboardButton(t(chat_id, "btn_offers"), callback_data="offers")]
     ])
 
+def more_info_summary_kb(chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t(chat_id, "btn_players_links"), callback_data="players_links")],
+        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]
+    ])
+
+def players_links_kb(chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t(chat_id, "btn_player_iplay"), callback_data="player_links|iplay")],
+        [InlineKeyboardButton(t(chat_id, "btn_player_splayer"), callback_data="player_links|splayer")],
+        [InlineKeyboardButton(t(chat_id, "btn_player_000"), callback_data="player_links|000")],
+        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="more_info")]
+    ])
+
 def packages_kb() -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(pkg, callback_data=f"pkg|{pkg}")] for pkg in PACKAGES.keys()]
-    rows.append([InlineKeyboardButton(I18N["btn_back"]["ar"] + " / " + I18N["btn_back"]["en"], callback_data="back_home")])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data="back_home")])
     return InlineKeyboardMarkup(rows)
 
 def agree_kb(chat_id: int, pkg_name: str, reason: str) -> InlineKeyboardMarkup:
@@ -578,7 +598,7 @@ def pay_kb(chat_id: int, pkg_name: str, reason: str) -> InlineKeyboardMarkup:
 def trial_packages_kb() -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(f"{pkg} — {PACKAGES[pkg]['trial_hours']}h", callback_data=f"trial_pkg|{pkg}")]
             for pkg in PACKAGES.keys()]
-    rows.append([InlineKeyboardButton(I18N["btn_back"]["ar"] + " / " + I18N["btn_back"]["en"], callback_data="back_home")])
+    rows.append([InlineKeyboardButton("⬅️ Back", callback_data="back_home")])
     return InlineKeyboardMarkup(rows)
 
 def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
@@ -939,9 +959,28 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
         return
 
+    # ===== More Info (summary + links) =====
     if data == "more_info":
-        text = t(chat_id, "more_info_title") + "\n\n" + t(chat_id, "more_info_body")
-        await safe_edit_or_send(q, context, chat_id, text, main_menu_kb(chat_id), no_preview=True)
+        text = t(chat_id, "more_info_title") + "\n\n" + t(chat_id, "more_info_body_compact")
+        await safe_edit_or_send(q, context, chat_id, text, more_info_summary_kb(chat_id), no_preview=True)
+        return
+
+    if data == "players_links":
+        await safe_edit_or_send(q, context, chat_id, t(chat_id, "players_links_title"), players_links_kb(chat_id))
+        return
+
+    if data.startswith("player_links|"):
+        _, which = data.split("|", 1)
+        if which == "iplay":
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "player_iplay_body"), players_links_kb(chat_id))
+            return
+        if which == "splayer":
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "player_splayer_body"), players_links_kb(chat_id))
+            return
+        if which == "000":
+            await safe_edit_or_send(q, context, chat_id, t(chat_id, "player_000_body"), players_links_kb(chat_id))
+            return
+        await safe_edit_or_send(q, context, chat_id, t(chat_id, "players_links_title"), players_links_kb(chat_id))
         return
 
     # Subscribe
@@ -974,7 +1013,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Support
     if data == "support":
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-        # Arabic/English labels shown based on t()
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "support_pick"), support_issues_kb(chat_id))
         return
 
