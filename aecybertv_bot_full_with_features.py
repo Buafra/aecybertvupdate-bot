@@ -141,83 +141,115 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
 }
 
 # ------------------------- OFFERS -------------------------
+# ------------------------- OFFERS -------------------------
 def build_embedded_offers() -> List[Dict[str, Any]]:
-    shared_cta = "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06"
+    """AECyberTV official offers schedule (2025–2026)"""
     body_en = (
-        "📺 Over 52,300 Live Channels\n"
-        "🎬 Over 209,700 Movies (VOD)\n"
-        "📂 Over 11,500 Series\n"
-        "🌍 Total Content: ≈ 273,500+"
+        "🎬 Enjoy thousands of Live Channels, Movies, and Series!\n"
+        "Available for all AECyberTV packages."
     )
     body_ar = (
-        "📺 أكثر من 52,300 قناة مباشرة\n"
-        "🎬 أكثر من 209,700 فيلم (VOD)\n"
-        "📂 أكثر من 11,500 مسلسل\n"
-        "🌍 إجمالي المحتوى: حوالي 273,500+"
+        "🎬 استمتع بآلاف القنوات والأفلام والمسلسلات!\n"
+        "العرض متوفر لجميع باقات AECyberTV."
     )
-    h_start_utc, h_end_utc = dubai_range_to_utc_iso(
-        datetime(2025, 10, 24, 0, 0, 0, tzinfo=DUBAI_TZ),
-        datetime(2025, 11, 7, 23, 59, 59, tzinfo=DUBAI_TZ),
-    )
-    halloween = {
-        "id": "halloween2025",
-        "title_en": "🎃 Halloween Offer — Limited Time",
-        "title_ar": "🎃 عرض الهالوين — لفترة محدودة",
-        "body_en": "Valid until the first week of November 2025.\n\n" + body_en,
-        "body_ar": "ساري حتى الأسبوع الأول من نوفمبر 2025.\n\n" + body_ar,
-        "cta_url": shared_cta, "start_at": h_start_utc, "end_at": h_end_utc, "priority": 50
-    }
-    n_start_utc, n_end_utc = dubai_range_to_utc_iso(
-        datetime(2025, 11, 27, 0, 0, 0, tzinfo=DUBAI_TZ),
-        datetime(2025, 12, 10, 23, 59, 59, tzinfo=DUBAI_TZ),
-    )
-    national_day = {
+
+    # Helper to format Dubai-local → UTC ISO timestamps
+    def _range(y1, m1, d1, y2, m2, d2):
+        return dubai_range_to_utc_iso(
+            datetime(y1, m1, d1, 0, 0, 0, tzinfo=DUBAI_TZ),
+            datetime(y2, m2, d2, 23, 59, 59, tzinfo=DUBAI_TZ),
+        )
+
+    offers = []
+
+    # 1️⃣ Early Offer (from now until Dec 1)
+    s, e = _range(2025, 11, 6, 2025, 11, 30)
+    offers.append({
+        "id": "early_offer_nov2025",
+        "title_en": "🕐 Early Bird Offer — Until UAE National Day",
+        "title_ar": "🕐 عرض ما قبل اليوم الوطني",
+        "body_en": (
+            f"{body_en}\n\n"
+            "📅 Valid until 30 Nov 2025\n\n"
+            "💰 Prices:\n"
+            "• Casual – 50 AED/year\n"
+            "• Executive – 150 AED/year\n"
+            "• Premium – 200 AED/year\n"
+            "• Kids – 50 AED/year"
+        ),
+        "body_ar": (
+            f"{body_ar}\n\n"
+            "📅 ساري حتى 30 نوفمبر 2025\n\n"
+            "💰 الأسعار:\n"
+            "• عادي – 50 درهم/سنة\n"
+            "• تنفيذي – 150 درهم/سنة\n"
+            "• بريميوم – 200 درهم/سنة\n"
+            "• أطفال – 50 درهم/سنة"
+        ),
+        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "start_at": s, "end_at": e, "priority": 100
+    })
+
+    # 2️⃣ UAE National Day (Dec 1–7)
+    s, e = _range(2025, 12, 1, 2025, 12, 7)
+    offers.append({
         "id": "uae_national_day_2025",
-        "title_en": "🇦🇪 UAE National Day — Special Offer",
-        "title_ar": "🇦🇪 عرض اليوم الوطني — عرض خاص",
-        "body_en": body_en, "body_ar": body_ar,
-        "cta_url": shared_cta, "start_at": n_start_utc, "end_at": n_end_utc, "priority": 100
-    }
-    y_start_utc, y_end_utc = dubai_range_to_utc_iso(
-        datetime(2025, 12, 25, 0, 0, 0, tzinfo=DUBAI_TZ),
-        datetime(2026, 1, 10, 23, 59, 59, tzinfo=DUBAI_TZ),
-    )
-    new_year = {
-        "id": "new_year_2026",
-        "title_en": "🎉 New Year Offer — Limited Time",
-        "title_ar": "🎉 عرض رأس السنة — لفترة محدودة",
-        "body_en": body_en, "body_ar": body_ar,
-        "cta_url": shared_cta, "start_at": y_start_utc, "end_at": y_end_utc, "priority": 90
-    }
-    return sorted([national_day, new_year, halloween], key=lambda x: int(x.get("priority", 0)), reverse=True)
+        "title_en": "🇦🇪 UAE National Day — Eid Al-Etihad 54% OFF",
+        "title_ar": "🇦🇪 عرض اليوم الوطني — عيد الاتحاد خصم 54%",
+        "body_en": (
+            f"{body_en}\n\n"
+            "📅 1–7 December 2025\n\n"
+            "💰 Discounted Prices:\n"
+            "• Casual – 34.6 AED/year\n"
+            "• Executive – 95 AED/year\n"
+            "• Premium – 115 AED/year\n"
+            "• Kids – 32 AED/year"
+        ),
+        "body_ar": (
+            f"{body_ar}\n\n"
+            "📅 من 1 إلى 7 ديسمبر 2025\n\n"
+            "💰 الأسعار بعد الخصم:\n"
+            "• عادي – 34.6 درهم/سنة\n"
+            "• تنفيذي – 95 درهم/سنة\n"
+            "• بريميوم – 115 درهم/سنة\n"
+            "• أطفال – 32 درهم/سنة"
+        ),
+        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "start_at": s, "end_at": e, "priority": 200
+    })
+
+    # 3️⃣ Christmas & New Year (Dec 24–Jan 5)
+    s, e = _range(2025, 12, 24, 2026, 1, 5)
+    offers.append({
+        "id": "xmas_newyear_2025_2026",
+        "title_en": "🎄 Christmas & New Year Offer",
+        "title_ar": "🎄 عرض الكريسماس ورأس السنة",
+        "body_en": (
+            f"{body_en}\n\n"
+            "📅 24 Dec 2025 – 5 Jan 2026\n\n"
+            "💰 Prices:\n"
+            "• Casual – 50 AED/year\n"
+            "• Executive – 150 AED/year\n"
+            "• Premium – 200 AED/year\n"
+            "• Kids – 50 AED/year"
+        ),
+        "body_ar": (
+            f"{body_ar}\n\n"
+            "📅 من 24 ديسمبر 2025 حتى 5 يناير 2026\n\n"
+            "💰 الأسعار:\n"
+            "• عادي – 50 درهم/سنة\n"
+            "• تنفيذي – 150 درهم/سنة\n"
+            "• بريميوم – 200 درهم/سنة\n"
+            "• أطفال – 50 درهم/سنة"
+        ),
+        "cta_url": "https://buy.stripe.com/bJedRa6vXe9aa6k1wR5kk06",
+        "start_at": s, "end_at": e, "priority": 150
+    })
+
+    return sorted(offers, key=lambda x: int(x.get("priority", 0)), reverse=True)
 
 OFFERS_ALL: List[Dict[str, Any]] = []
 
-def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()
-    acts = []
-    for o in OFFERS_ALL:
-        try:
-            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
-                acts.append(o)
-        except Exception:
-            continue
-    acts.sort(key=lambda x: (int(x.get("priority", 0)) * -1, x.get("start_at", "")))
-    return acts
-
-def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()
-    ups = []
-    for o in OFFERS_ALL:
-        try:
-            if now < _parse_iso(o["start_at"]):
-                ups.append(o)
-        except Exception:
-            continue
-    ups.sort(key=lambda x: x.get("start_at", ""))
-    return ups
 
 # ------------------------- STATE -------------------------
 USER_STATE: Dict[int, Dict[str, Any]] = {}
