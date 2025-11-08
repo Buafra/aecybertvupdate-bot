@@ -15,21 +15,20 @@ from typing import Dict, Any, Optional, List
 
 from zoneinfo import ZoneInfo
 
-from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto, BotCommand, BotCommandScopeDefault, BotCommandScopeChat)
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
+)
 from telegram.ext import (
+from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+# ---------- AECyberTV: Left-side Command Menu (EN+AR + Admin) ----------
+import os as _os_for_menu  # kept unindented at top-level
 
-
-# ---------- AECyberTV: Left-side Command Menu (non-invasive) ----------
-import os as _os_for_menu  # alias to avoid clashing
-
-# ADMIN_CHAT_ID can be provided via env; if not set, admin scope is skipped gracefully
 try:
     _ADMIN_CHAT_ID_MENU = int(_os_for_menu.getenv("ADMIN_CHAT_ID", "0"))
 except Exception:
     _ADMIN_CHAT_ID_MENU = 0
 
-# English and Arabic command sets
 _COMMANDS_EN_MENU = [
     BotCommand("start", "🏠 Main Menu / Start"),
     BotCommand("offers", "🎁 View current offers"),
@@ -62,13 +61,13 @@ _ADMIN_COMMANDS_MENU = [
 
 async def setup_bot_menus(application):
     """
-    Non-breaking: registers Telegram command menus.
+    Non-breaking: registers Telegram command menus (EN+AR).
     Safe to call at startup; does not modify your handlers or flows.
     """
     bot = application.bot
-    # A) Global default menu
+    # Default (global) menu
     await bot.set_my_commands(_COMMANDS_EN_MENU, scope=BotCommandScopeDefault())
-    # B) Localized menus
+    # Language-specific menus (best effort)
     try:
         await bot.set_my_commands(_COMMANDS_EN_MENU, language_code="en")
     except Exception:
@@ -77,7 +76,7 @@ async def setup_bot_menus(application):
         await bot.set_my_commands(_COMMANDS_AR_MENU, language_code="ar")
     except Exception:
         pass
-    # C) Admin-only extended menu (in your admin chat only)
+    # Admin-only extended menu, limited to your admin chat
     if _ADMIN_CHAT_ID_MENU:
         try:
             await bot.set_my_commands(_COMMANDS_EN_MENU + _ADMIN_COMMANDS_MENU,
@@ -85,7 +84,6 @@ async def setup_bot_menus(application):
         except Exception:
             pass
 # ---------- /AECyberTV: Left-side Command Menu ----------
-
 
     Application, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
