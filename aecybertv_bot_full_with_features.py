@@ -157,9 +157,8 @@ CTA_DEFAULT: Dict[str, str] = {
 }
 
 # ------------------------- OFFERS (NEW) -------------------------
-
 def build_embedded_offers() -> List[Dict[str, Any]]:
-    """AECyberTV official offers schedule (2025–2026)."""
+    """AECybertv official offers schedule (2025–2026)."""
     note_en = "ℹ️ Note: offers may change at any time."
     note_ar = "ℹ️ ملاحظة: العروض قابلة للتغيير في أي وقت."
 
@@ -235,6 +234,32 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
     })
 
     return offers
+
+def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    acts: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
+                acts.append(o)
+        except Exception:
+            continue
+    acts.sort(key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
+    return acts
+
+def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    ups: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if now < _parse_iso(o["start_at"]):
+                ups.append(o)
+        except Exception:
+            continue
+    ups.sort(key=lambda x: x.get("start_at", ""))
+    return ups
 
 # ------------------------- STATE -------------------------
 USER_STATE: Dict[int, Dict[str, Any]] = {}
