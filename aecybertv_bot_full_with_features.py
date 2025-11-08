@@ -17,14 +17,13 @@ from zoneinfo import ZoneInfo
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto,
+    BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 )
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
 )
-from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
-
 # ---------- AECyberTV: Left-side Command Menu (EN+AR + Admin) ----------
 import os as _os_for_menu  # kept unindented at top-level
 
@@ -89,9 +88,6 @@ async def setup_bot_menus(application):
             pass
 # ---------- /AECyberTV: Left-side Command Menu ----------
 
-    Application, CommandHandler, ContextTypes,
-    MessageHandler, CallbackQueryHandler, filters
-)
 
 # ------------------------- CONFIG -------------------------
 def env_int(name: str, default: Optional[int] = None) -> Optional[int]:
@@ -1267,6 +1263,8 @@ def main():
     OFFERS_ALL = build_embedded_offers()
 
     app = Application.builder().token(BOT_TOKEN).post_init(_post_init).build()
+
+    await setup_bot_menus(app)
 
     # Commands
     app.add_handler(CommandHandler("start", start))
