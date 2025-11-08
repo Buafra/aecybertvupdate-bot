@@ -1244,34 +1244,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    # Current Offer — Nov 7–20, 2025 (single November offer)
-    s, e = _range(2025, 11, 7, 2025, 11, 20)
-    offers.append({
-        "id": "current_offer_nov2025",
-        "title_en": "🔥 Current Offer — Available Now",
-        "title_ar": "🔥 العرض الحالي — متاح الآن",
-        "body_en": (
-            f"{body_en_common}\n\n"
-            "📅 7–20 Nov 2025\n\n"
-            "💰 Prices:\n"
-            "• Kids – 50 AED/year\n"
-            "• Casual – 50 AED/year\n"
-            "• Executive – 150 AED/year\n"
-            "• Premium – 200 AED/year\n\n"
-            f"{note_en}"
-        ),
-        "body_ar": (
-            f"{body_ar_common}\n\n"
-            "📅 ٧–٢٠ نوفمبر ٢٠٢٥\n\n"
-            "💰 الأسعار:\n"
-            "• أطفال – ٥٠ درهم/سنة\n"
-            "• عادي – ٥٠ درهم/سنة\n"
-            "• تنفيذي – ١٥٠ درهم/سنة\n"
-            "• بريميوم – ٢٠٠ درهم/سنة\n\n"
-            f"{note_ar}"
-        ),
-        "cta_urls": CTA_DEFAULT,
-        "start_at": s, "end_at": e,
-        "priority": 100
-    })
