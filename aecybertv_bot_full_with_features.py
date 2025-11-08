@@ -18,7 +18,6 @@ from zoneinfo import ZoneInfo
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
-)
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
