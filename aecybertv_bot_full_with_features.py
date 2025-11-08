@@ -15,11 +15,78 @@ from typing import Dict, Any, Optional, List
 
 from zoneinfo import ZoneInfo
 
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
-)
+from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto, BotCommand, BotCommandScopeDefault, BotCommandScopeChat)
 from telegram.ext import (
+
+
+# ---------- AECyberTV: Left-side Command Menu (non-invasive) ----------
+import os as _os_for_menu  # alias to avoid clashing
+
+# ADMIN_CHAT_ID can be provided via env; if not set, admin scope is skipped gracefully
+try:
+    _ADMIN_CHAT_ID_MENU = int(_os_for_menu.getenv("ADMIN_CHAT_ID", "0"))
+except Exception:
+    _ADMIN_CHAT_ID_MENU = 0
+
+# English and Arabic command sets
+_COMMANDS_EN_MENU = [
+    BotCommand("start", "🏠 Main Menu / Start"),
+    BotCommand("offers", "🎁 View current offers"),
+    BotCommand("packages", "💼 AECyberTV packages"),
+    BotCommand("renew", "🔄 Renew subscription"),
+    BotCommand("trial", "🆓 Free trial"),
+    BotCommand("players", "📺 Player apps & activation"),
+    BotCommand("support", "📞 Contact support"),
+    BotCommand("help", "❓ Help"),
+]
+
+_COMMANDS_AR_MENU = [
+    BotCommand("start", "🏠 القائمة الرئيسية / بدء"),
+    BotCommand("offers", "🎁 العروض الحالية"),
+    BotCommand("packages", "💼 باقات AECyberTV"),
+    BotCommand("renew", "🔄 تجديد الاشتراك"),
+    BotCommand("trial", "🆓 تجربة مجانية"),
+    BotCommand("players", "📺 تطبيقات التشغيل وطريقة التفعيل"),
+    BotCommand("support", "📞 الدعم الفني"),
+    BotCommand("help", "❓ مساعدة"),
+]
+
+_ADMIN_COMMANDS_MENU = [
+    BotCommand("status", "📊 Bot & server status"),
+    BotCommand("offers_now", "🎁 List active offers"),
+    BotCommand("upcoming_offers", "🗓️ List upcoming offers"),
+    BotCommand("offer_reload", "♻️ Rebuild offers cache"),
+    BotCommand("debug_id", "🧩 Echo my Telegram ID"),
+]
+
+async def setup_bot_menus(application):
+    """
+    Non-breaking: registers Telegram command menus.
+    Safe to call at startup; does not modify your handlers or flows.
+    """
+    bot = application.bot
+    # A) Global default menu
+    await bot.set_my_commands(_COMMANDS_EN_MENU, scope=BotCommandScopeDefault())
+    # B) Localized menus
+    try:
+        await bot.set_my_commands(_COMMANDS_EN_MENU, language_code="en")
+    except Exception:
+        pass
+    try:
+        await bot.set_my_commands(_COMMANDS_AR_MENU, language_code="ar")
+    except Exception:
+        pass
+    # C) Admin-only extended menu (in your admin chat only)
+    if _ADMIN_CHAT_ID_MENU:
+        try:
+            await bot.set_my_commands(_COMMANDS_EN_MENU + _ADMIN_COMMANDS_MENU,
+                                      scope=BotCommandScopeChat(chat_id=_ADMIN_CHAT_ID_MENU))
+        except Exception:
+            pass
+# ---------- /AECyberTV: Left-side Command Menu ----------
+
+
     Application, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
 )
