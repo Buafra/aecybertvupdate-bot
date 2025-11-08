@@ -157,6 +157,7 @@ CTA_DEFAULT: Dict[str, str] = {
 }
 
 # ------------------------- OFFERS (NEW) -------------------------
+
 def build_embedded_offers() -> List[Dict[str, Any]]:
     """AECyberTV official offers schedule (2025–2026)."""
     note_en = "ℹ️ Note: offers may change at any time."
@@ -179,100 +180,61 @@ def build_embedded_offers() -> List[Dict[str, Any]]:
 
     offers: List[Dict[str, Any]] = []
 
-    # 1) Current offer — active now (Nov 6 → Nov 30, 2025)
-    s, e = _range(2025, 11, 6, 2025, 11, 30)
-    # 2) UAE National Day — Dec 1–7, 2025
-    s, e = _range(2025, 12, 1, 2025, 12, 7)
+    # Current Offer — single November offer (Nov 7 → Nov 20, 2025)
+    s, e = _range(2025, 11, 7, 2025, 11, 20)
     offers.append({
-        "id": "uae_national_day_2025",
-        "title_en": "🇦🇪 UAE National Day — Available offers now",
-        "title_ar": "🇦🇪 اليوم الوطني — العروض المتاحة الآن",
+        "id": "current_offer_nov2025",
+        "title_en": "🔥 Current Offer — Available Now",
+        "title_ar": "🔥 العرض الحالي — متاح الآن",
         "body_en": (
             f"{body_en_common}\n\n"
-            "📅 1–7 December 2025\n\n"
-            "💰 Discounted Prices:\n"
-            "• Casual – 34.6 AED/year\n"
-            "• Executive – 95 AED/year\n"
-            "• Premium – 115 AED/year\n"
-            "• Kids – 32 AED/year\n\n"
-            f"{note_en}"
-        ),
-        "body_ar": (
-            f"{body_ar_common}\n\n"
-            "📅 من 1 إلى 7 ديسمبر 2025\n\n"
-            "💰 الأسعار بعد الخصم:\n"
-            "• باقة الـ Casual – 34.6 درهم/سنة\n"
-            "• باقة الـ Executive – 95 درهم/سنة\n"
-            "• باقة الـ Premium – 115 درهم/سنة\n"
-            "• باقة الـ Kids – 32 درهم/سنة\n\n"
-            f"{note_ar}"
-        ),
-        "cta_urls": CTA_NATIONAL_DAY,
-        "start_at": s, "end_at": e, "priority": 200
-    })
-
-    # 3) Christmas & New Year — Dec 24, 2025 – Jan 5, 2026
-    s, e = _range(2025, 12, 24, 2026, 1, 5)
-    offers.append({
-        "id": "xmas_newyear_2025_2026",
-        "title_en": "🎄 Christmas & New Year — Available offers now",
-        "title_ar": "🎄 الكريسماس ورأس السنة — العروض المتاحة الآن",
-        "body_en": (
-            f"{body_en_common}\n\n"
-            "📅 24 Dec 2025 – 5 Jan 2026\n\n"
+            "📅 7–20 Nov 2025\n\n"
             "💰 Prices:\n"
+            "• Kids – 50 AED/year\n"
             "• Casual – 50 AED/year\n"
             "• Executive – 150 AED/year\n"
-            "• Premium – 200 AED/year\n"
-            "• Kids – 50 AED/year\n\n"
+            "• Premium – 200 AED/year\n\n"
             f"{note_en}"
         ),
         "body_ar": (
             f"{body_ar_common}\n\n"
-            "📅 من 24 ديسمبر 2025 حتى 5 يناير 2026\n\n"
+            "📅 ٧–٢٠ نوفمبر ٢٠٢٥\n\n"
             "💰 الأسعار:\n"
-            "• باقة الـ Casual – 50 درهم/سنة\n"
-            "• باقة الـ Executive – 150 درهم/سنة\n"
-            "• باقة الـ Premium – 200 درهم/سنة\n"
-            "• باقة الـ Kids – 50 درهم/سنة\n\n"
+            "• أطفال – ٥٠ درهم/سنة\n"
+            "• عادي – ٥٠ درهم/سنة\n"
+            "• تنفيذي – ١٥٠ درهم/سنة\n"
+            "• بريميوم – ٢٠٠ درهم/سنة\n\n"
             f"{note_ar}"
         ),
         "cta_urls": CTA_DEFAULT,
         "start_at": s, "end_at": e, "priority": 150
     })
 
-    # Sort by priority desc, then start time asc
-    return sorted(offers, key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
+    # UAE National Day — Dec 1–7, 2025
+    s, e = _range(2025, 12, 1, 2025, 12, 7)
+    offers.append({
+        "id": "uae_national_day_2025",
+        "title_en": "🇦🇪 UAE National Day Offer",
+        "title_ar": "🇦🇪 عرض اليوم الوطني",
+        "body_en": f"{body_en_common}\n\n📅 1–7 Dec 2025\n\n{note_en}",
+        "body_ar": f"{body_ar_common}\n\n📅 من 1 إلى 7 ديسمبر 2025\n\n{note_ar}",
+        "cta_urls": CTA_NATIONAL_DAY,
+        "start_at": s, "end_at": e, "priority": 200
+    })
 
-# In-memory offers list, rebuilt at startup and via /offer_reload
-OFFERS_ALL: List[Dict[str, Any]] = []
+    # Christmas & New Year — Dec 24, 2025 – Jan 5, 2026
+    s, e = _range(2025, 12, 24, 2026, 1, 5)
+    offers.append({
+        "id": "xmas_newyear_2025_2026",
+        "title_en": "🎄 Christmas & New Year Offer",
+        "title_ar": "🎄 عرض الكريسماس ورأس السنة",
+        "body_en": f"{body_en_common}\n\n📅 24 Dec 2025 – 5 Jan 2026\n\n{note_en}",
+        "body_ar": f"{body_ar_common}\n\n📅 ٢٤ ديسمبر ٢٠٢٥ – ٥ يناير ٢٠٢٦\n\n{note_ar}",
+        "cta_urls": CTA_DEFAULT,
+        "start_at": s, "end_at": e, "priority": 100
+    })
 
-# --- Offer query helpers ---
-def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()  # UTC
-    acts: List[Dict[str, Any]] = []
-    for o in OFFERS_ALL:
-        try:
-            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
-                acts.append(o)
-        except Exception:
-            continue
-    acts.sort(key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
-    return acts
-
-def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()  # UTC
-    ups: List[Dict[str, Any]] = []
-    for o in OFFERS_ALL:
-        try:
-            if now < _parse_iso(o["start_at"]):
-                ups.append(o)
-        except Exception:
-            continue
-    ups.sort(key=lambda x: x.get("start_at", ""))
-    return ups
+    return offers
 
 # ------------------------- STATE -------------------------
 USER_STATE: Dict[int, Dict[str, Any]] = {}
