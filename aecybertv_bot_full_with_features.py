@@ -17,8 +17,7 @@ from zoneinfo import ZoneInfo
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto,
-    BotCommand, BotCommandScopeChat, BotCommandScopeDefault
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
 )
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -576,19 +575,6 @@ def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]]
     return InlineKeyboardMarkup(rows)
 
-
-def customer_main_keyboard(chat_id: int) -> ReplyKeyboardMarkup:
-    """Bottom menu for customers (like driver bot) — works on iPhone and Android.
-
-    Buttons reuse the same labels as the inline main menu:
-    - Offers, Subscribe/Packages, Renew, Trial, Support, More Info
-    """
-    keyboard = [
-        [KeyboardButton(t(chat_id, "btn_offers")), KeyboardButton(t(chat_id, "btn_subscribe"))],
-        [KeyboardButton(t(chat_id, "btn_renew")), KeyboardButton(t(chat_id, "btn_trial"))],
-        [KeyboardButton(t(chat_id, "btn_support")), KeyboardButton(t(chat_id, "btn_more_info"))],
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [[KeyboardButton(t(chat_id, "btn_share_phone"), request_contact=True)]],
@@ -732,53 +718,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
 
-async def packages_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show subscription packages (same as Subscribe button)."""
-    chat_id = update.effective_chat.id
-    # Start subscribe flow
-    set_state(chat_id, flow="subscribe", awaiting_phone=False, awaiting_phone_reason=None)
-    await update.message.reply_text(t(chat_id, "subscribe_pick"), reply_markup=packages_kb())
-
-async def renew_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start renewal flow (same as Renew button)."""
-    chat_id = update.effective_chat.id
-    set_state(chat_id, flow="renew", awaiting_phone=False, awaiting_phone_reason=None)
-    await update.message.reply_text(t(chat_id, "subscribe_pick"), reply_markup=packages_kb())
-
-async def trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start free trial flow (same as Trial button)."""
-    chat_id = update.effective_chat.id
-    set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-    await update.message.reply_text(t(chat_id, "trial_pick"), reply_markup=trial_packages_kb())
-
-async def support_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Open support ticket flow (same as Support button)."""
-    chat_id = update.effective_chat.id
-    set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-    await update.message.reply_text(t(chat_id, "support_pick"), reply_markup=support_issues_kb(chat_id))
-
-async def offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show active offers (same as Offers button)."""
-    chat_id = update.effective_chat.id
-    acts = active_offers()
-    if not acts:
-        await update.message.reply_text(t(chat_id, "offers_none"))
-        return
-    rows = []
-    lang = get_state(chat_id).get("lang", "ar")
-    for idx, o in enumerate(acts):
-        title = o["title_ar"] if lang == "ar" else o["title_en"]
-        rows.append([InlineKeyboardButton(title, callback_data=f"offer_act|{idx}")])
-    rows.append([InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")])
-    await update.message.reply_text(t(chat_id, "offers_title"), reply_markup=InlineKeyboardMarkup(rows))
-
-async def info_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show more info about AECyberTV (same as More Info button)."""
-    chat_id = update.effective_chat.id
-    text = t(chat_id, "more_info_title") + "\n\n" + t(chat_id, "more_info_body_compact")
-    await update.message.reply_text(text, reply_markup=more_info_summary_kb(chat_id), disable_web_page_preview=True)
-
-
 # Admin/utility commands
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update.effective_user.id):
@@ -876,43 +815,11 @@ async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                                             reply_markup=phone_request_kb(chat_id))
             return
 
-
-    # Bottom customer menu (ReplyKeyboard) — like driver bot
-    # Map button labels to the same flows as commands / inline buttons
-    if txt in (
-        t(chat_id, "btn_offers"),
-        t(chat_id, "btn_subscribe"),
-        t(chat_id, "btn_renew"),
-        t(chat_id, "btn_trial"),
-        t(chat_id, "btn_support"),
-        t(chat_id, "btn_more_info"),
-    ):
-        # Decide which action based on exact label
-        if txt == t(chat_id, "btn_offers"):
-            await offers_cmd(update, context)
-        elif txt == t(chat_id, "btn_subscribe"):
-            # For bottom menu, treat "Subscribe" same as "Packages"
-            await packages_cmd(update, context)
-        elif txt == t(chat_id, "btn_renew"):
-            await renew_cmd(update, context)
-        elif txt == t(chat_id, "btn_trial"):
-            await trial_cmd(update, context)
-        elif txt == t(chat_id, "btn_support"):
-            await support_cmd(update, context)
-        elif txt == t(chat_id, "btn_more_info"):
-            await info_cmd(update, context)
-        return
     # Default: language or menu
     if "lang" not in st:
         await update.message.reply_text(t(chat_id, "pick_lang"), reply_markup=lang_kb())
     else:
-        # Show inline main menu + bottom customer keyboard (works on iPhone & Android)
         await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
-        try:
-            await update.message.reply_text("👇 Use the menu buttons below:", reply_markup=customer_main_keyboard(chat_id))
-        except Exception:
-            # Even if keyboard fails, bot still works
-            pass
 
 async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
@@ -1005,15 +912,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         set_state(chat_id, lang=lang, awaiting_phone=False, awaiting_phone_reason=None,
                   awaiting_username=False, awaiting_username_reason=None, flow=None, trial_pkg=None)
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
-        # Also show bottom customer menu (ReplyKeyboard) so it appears on iPhone like driver bot
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="👇 Use the menu buttons below:",
-                reply_markup=customer_main_keyboard(chat_id)
-            )
-        except Exception:
-            pass
         return
 
     if "lang" not in st:
@@ -1292,35 +1190,6 @@ async def _post_init(application: Application):
     except Exception as e:
         logging.warning("Webhook init/cleanup failed: %s", e)
 
-    # Set bot commands (left-side menu)
-    try:
-        customer_commands = [
-            BotCommand("start", "Start / pick language"),
-            BotCommand("help", "Help / main menu"),
-            BotCommand("offers", "Show current offers"),
-            BotCommand("packages", "View subscription packages"),
-            BotCommand("renew", "Renew your subscription"),
-            BotCommand("trial", "Free trial request"),
-            BotCommand("support", "Support / contact us"),
-            BotCommand("info", "More info about AECyberTV"),
-            BotCommand("done", "Finish support ticket"),
-        ]
-        # Default customer menu (all users)
-        await application.bot.set_my_commands(customer_commands, scope=BotCommandScopeDefault())
-
-        # Admin menu (customer commands + admin tools) visible only in ADMIN_CHAT_ID
-        if ADMIN_CHAT_ID:
-            admin_commands = customer_commands + [
-                BotCommand("status", "Admin: bot status"),
-                BotCommand("offers_now", "Admin: active offers"),
-                BotCommand("upcoming_offers", "Admin: upcoming offers"),
-                BotCommand("offer_reload", "Admin: reload offers file"),
-                BotCommand("debug_id", "Admin: debug IDs"),
-            ]
-            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=ADMIN_CHAT_ID))
-    except Exception as e:
-        logging.warning("Failed to set bot commands: %s", e)
-
 # ------------------------- MAIN -------------------------
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -1333,12 +1202,6 @@ def main():
     # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(CommandHandler("offers", offers_cmd))
-    app.add_handler(CommandHandler("packages", packages_cmd))
-    app.add_handler(CommandHandler("renew", renew_cmd))
-    app.add_handler(CommandHandler("trial", trial_cmd))
-    app.add_handler(CommandHandler("support", support_cmd))
-    app.add_handler(CommandHandler("info", info_cmd))
     app.add_handler(CommandHandler("done", done_cmd))  # support finalize
 
     # Admin
