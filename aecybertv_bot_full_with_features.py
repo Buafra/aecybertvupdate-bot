@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto, BotCommand, BotCommandScopeChat
 )
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -1189,6 +1189,26 @@ async def _post_init(application: Application):
             await application.bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
         logging.warning("Webhook init/cleanup failed: %s", e)
+    # Set bot commands (left-side menu)
+    try:
+        base_commands = [
+            BotCommand('start', 'Start / pick language'),
+            BotCommand('help', 'Help / main menu'),
+            BotCommand('done', 'Finish support ticket'),
+        ]
+        await application.bot.set_my_commands(base_commands)
+        if ADMIN_CHAT_ID:
+            admin_commands = base_commands + [
+                BotCommand('status', 'Admin: bot status'),
+                BotCommand('offers_now', 'Admin: active offers'),
+                BotCommand('upcoming_offers', 'Admin: upcoming offers'),
+                BotCommand('offer_reload', 'Admin: reload offers'),
+                BotCommand('debug_id', 'Admin: debug IDs'),
+            ]
+            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=ADMIN_CHAT_ID))
+    except Exception as e:
+        logging.warning('Failed to set bot commands: %s', e)
+
 
 # ------------------------- MAIN -------------------------
 def main():
