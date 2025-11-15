@@ -17,7 +17,8 @@ from zoneinfo import ZoneInfo
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto
+    ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Contact, InputMediaPhoto,
+    BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 )
 from telegram.ext import (
     Application, CommandHandler, ContextTypes,
@@ -40,236 +41,66 @@ WEBHOOK_URL   = os.getenv("WEBHOOK_URL")   # optional
 
 if not BOT_TOKEN:
     logging.basicConfig(level=logging.ERROR, format="%(asctime)s - %(levelname)s - %(message)s")
-    logging.error("Missing BOT_TOKEN env var. Set BOT_TOKEN before running.")
+    logging.error("BOT_TOKEN is required.")
     sys.exit(1)
 
-# ------------------------- TIME/UTILS -------------------------
-DUBAI_TZ = ZoneInfo("Asia/Dubai")
+DATA_DIR = Path(os.getenv("DATA_DIR", ".")).resolve()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+CUSTOMERS_FILE = DATA_DIR / "customers.jsonl"
+TRIALS_FILE    = DATA_DIR / "trials.jsonl"
+SUPPORT_FILE   = DATA_DIR / "support.jsonl"
+OFFERS_FILE    = DATA_DIR / "offers.json"
+STATE_FILE     = DATA_DIR / "state.json"
+
+TZ_UAE = ZoneInfo("Asia/Dubai")
+
+# ------------------------- UTILITIES -------------------------
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 def _now_uae() -> datetime:
-    return datetime.now(DUBAI_TZ)
+    return _utcnow().astimezone(TZ_UAE)
 
-def _parse_iso(ts: str) -> datetime:
-    ts = ts.strip()
-    if ts.endswith("Z"):
-        ts = ts[:-1] + "+00:00"
-    return datetime.fromisoformat(ts)
-
-def _iso_utc(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-def dubai_range_to_utc_iso(start_local: datetime, end_local: datetime) -> tuple[str, str]:
-    if start_local.tzinfo is None:
-        start_local = start_local.replace(tzinfo=DUBAI_TZ)
-    if end_local.tzinfo is None:
-        end_local = end_local.replace(tzinfo=DUBAI_TZ)
-    return _iso_utc(start_local), _iso_utc(end_local)
-
-# ------------------------- FILE IO -------------------------
-HISTORY_FILE = Path("customers.jsonl")
-TRIALS_FILE  = Path("trials.jsonl")
-SUPPORT_FILE = Path("support.jsonl")
-
-def save_jsonl(path: Path, obj: dict) -> int:
-    """Append obj to JSONL with an auto ticket id (line number)."""
-    path.touch(exist_ok=True)
-    tid = 0
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            for tid, _ in enumerate(f, start=1):
-                pass
-    except Exception:
-        tid = 0
-    tid = (tid or 0) + 1
-    rec = {"id": tid, **obj}
+def save_jsonl(path: Path, rec: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    return tid
 
-def iter_jsonl(path: Path):
+def load_jsonl(path: Path) -> List[dict]:
     if not path.exists():
         return []
-    items = []
+    out = []
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
-                items.append(json.loads(line))
+                out.append(json.loads(line))
             except Exception:
                 continue
-    return items
+    return out
 
-# ------------------------- PACKAGES -------------------------
-PACKAGES: Dict[str, Dict[str, Any]] = {
-    "AECyberTV Kids": {
-        "code": "kids",
-        "price_aed": 70,
-        "trial_hours": 8,
-        "details_en": "\n• Kids-safe channels\n• Cartoons & Educational shows\n• Works on 1 device\n",
-        "details_ar": "\n• قنوات للأطفال\n• كرتون وبرامج تعليمية\n• يعمل على جهاز واحد\n",
-        "payment_url": "https://buy.stripe.com/3cIbJ29I94yA92g2AV5kk04",
-    },
-    "AECyberTV Casual": {
-        "code": "casual",
-        "price_aed": 75,
-        "trial_hours": 24,
-        "details_en": "\n• 10,000+ Live Channels\n• 70,000+ Movies (VOD)\n• 12,000+ Series\n• Works on 1 device\n",
-        "details_ar": "\n• أكثر من 10,000 قناة مباشرة\n• 70,000+ فيلم (VOD)\n• 12,000+ مسلسل\n• يعمل على جهاز واحد\n",
-        "payment_url": "https://buy.stripe.com/6oU6oIf2t8OQa6kejD5kk03",
-    },
-    "AECyberTV Executive": {
-        "code": "executive",
-        "price_aed": 200,
-        "trial_hours": 10,
-        "details_en": "\n• 16,000+ Live Channels\n• 24,000+ Movies (VOD)\n• 14,000+ Series\n• 2 devices • SD/HD/FHD/4K\n",
-        "details_ar": "\n• 16,000+ قناة مباشرة\n• 24,000+ فيلم (VOD)\n• 14,000+ مسلسل\n• جهازان • SD/HD/FHD/4K\n",
-        "payment_url": "https://buy.stripe.com/8x23cw07zghi4M0ejD5kk05",
-    },
-    "AECyberTV Premium": {
-        "code": "premium",
-        "price_aed": 250,
-        "trial_hours": 24,
-        "details_en": "\n• Full combo package\n• 65,000+ Live Channels\n• 180,000+ Movies (VOD)\n• 10,000+ Series\n• Priority support\n",
-        "details_ar": "\n• باقة كاملة شاملة\n• 65,000+ قناة مباشرة\n• 180,000+ فيلم (VOD)\n• 10,000+ مسلسل\n• دعم أولوية\n",
-        "payment_url": "https://buy.stripe.com/eVq00k7A15CE92gdfz5kk01",
-    },
-}
+def load_json(path: Path, default):
+    if not path.exists():
+        return default
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
 
-# ------------------------- OFFER PAYMENT LINKS -------------------------
-# National Day (Dec 1–7, 2025)
-CTA_NATIONAL_DAY: Dict[str, str] = {
-    "Casual":   "https://buy.stripe.com/aFaaEYf2t9SU0vK7Vf5kk09",
-    "Executive":"https://buy.stripe.com/28EaEY07zghi5Q45N75kk0c",
-    "Kids":     "https://buy.stripe.com/9B6fZi4nP0ik1zO0sN5kk0b",
-    "Premium":  "https://buy.stripe.com/28EbJ26vXc12emA3EZ5kk0a",
-}
-# Christmas & New Year and other offers
-CTA_DEFAULT: Dict[str, str] = {
-    "Casual":   "https://buy.stripe.com/cNi8wQ3jL1moa6k1wR5kk0g",
-    "Premium":  "https://buy.stripe.com/aFa00k7A1e9aces2AV5kk0f",
-    "Kids":     "https://buy.stripe.com/cNi3cw5rTc12baoejD5kk0e",
-    "Executive":"https://buy.stripe.com/8x200kbQh7KM3HW1wR5kk0d",
-}
+def save_json(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
 
-# ------------------------- OFFERS (NEW) -------------------------
-def build_embedded_offers() -> List[Dict[str, Any]]:
-    """AECybertv official offers schedule (2025–2026)."""
-    note_en = "ℹ️ Note: offers may change at any time."
-    note_ar = "ℹ️ ملاحظة: العروض قابلة للتغيير في أي وقت."
-
-    body_en_common = (
-        "🎬 Enjoy thousands of Live Channels, Movies, and Series!\n"
-        "Available for all AECyberTV packages."
-    )
-    body_ar_common = (
-        "🎬 استمتع بآلاف القنوات والأفلام والمسلسلات!\n"
-        "العرض متوفر لجميع باقات AECyberTV."
-    )
-
-    def _range(y1, m1, d1, y2, m2, d2):
-        return dubai_range_to_utc_iso(
-            datetime(y1, m1, d1, 0, 0, 0, tzinfo=DUBAI_TZ),
-            datetime(y2, m2, d2, 23, 59, 59, tzinfo=DUBAI_TZ),
-        )
-
-    offers: List[Dict[str, Any]] = []
-
-    # Current Offer — single November offer (Nov 7 → Nov 20, 2025)
-    s, e = _range(2025, 11, 7, 2025, 11, 20)
-    offers.append({
-        "id": "current_offer_nov2025",
-        "title_en": "🔥 Current Offer — Available Now",
-        "title_ar": "🔥 العرض الحالي — متاح الآن",
-        "body_en": (
-            f"{body_en_common}\n\n"
-            "📅 7–20 Nov 2025\n\n"
-            "💰 Prices:\n"
-            "• Kids – 50 AED/year\n"
-            "• Casual – 50 AED/year\n"
-            "• Executive – 150 AED/year\n"
-            "• Premium – 200 AED/year\n\n"
-            f"{note_en}"
-        ),
-        "body_ar": (
-            f"{body_ar_common}\n\n"
-            "📅 ٧–٢٠ نوفمبر ٢٠٢٥\n\n"
-            "💰 الأسعار:\n"
-            "• أطفال – ٥٠ درهم/سنة\n"
-            "• عادي – ٥٠ درهم/سنة\n"
-            "• تنفيذي – ١٥٠ درهم/سنة\n"
-            "• بريميوم – ٢٠٠ درهم/سنة\n\n"
-            f"{note_ar}"
-        ),
-        "cta_urls": CTA_DEFAULT,
-        "start_at": s, "end_at": e, "priority": 150
-    })
-
-    # UAE National Day — Dec 1–7, 2025
-    s, e = _range(2025, 12, 1, 2025, 12, 7)
-    offers.append({
-        "id": "uae_national_day_2025",
-        "title_en": "🇦🇪 UAE National Day Offer",
-        "title_ar": "🇦🇪 عرض اليوم الوطني",
-        "body_en": f"{body_en_common}\n\n📅 1–7 Dec 2025\n\n{note_en}",
-        "body_ar": f"{body_ar_common}\n\n📅 من 1 إلى 7 ديسمبر 2025\n\n{note_ar}",
-        "cta_urls": CTA_NATIONAL_DAY,
-        "start_at": s, "end_at": e, "priority": 200
-    })
-
-    # Christmas & New Year — Dec 24, 2025 – Jan 5, 2026
-    s, e = _range(2025, 12, 24, 2026, 1, 5)
-    offers.append({
-        "id": "xmas_newyear_2025_2026",
-        "title_en": "🎄 Christmas & New Year Offer",
-        "title_ar": "🎄 عرض الكريسماس ورأس السنة",
-        "body_en": f"{body_en_common}\n\n📅 24 Dec 2025 – 5 Jan 2026\n\n{note_en}",
-        "body_ar": f"{body_ar_common}\n\n📅 ٢٤ ديسمبر ٢٠٢٥ – ٥ يناير ٢٠٢٦\n\n{note_ar}",
-        "cta_urls": CTA_DEFAULT,
-        "start_at": s, "end_at": e, "priority": 100
-    })
-
-    return offers
-
-def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()  # UTC
-    acts: List[Dict[str, Any]] = []
-    for o in OFFERS_ALL:
-        try:
-            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
-                acts.append(o)
-        except Exception:
-            continue
-    acts.sort(key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
-    return acts
-
-def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
-    if now is None:
-        now = _utcnow()  # UTC
-    ups: List[Dict[str, Any]] = []
-    for o in OFFERS_ALL:
-        try:
-            if now < _parse_iso(o["start_at"]):
-                ups.append(o)
-        except Exception:
-            continue
-    ups.sort(key=lambda x: x.get("start_at", ""))
-    return ups
+def _parse_iso(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 # ------------------------- STATE -------------------------
-USER_STATE: Dict[int, Dict[str, Any]] = {}
-PHONE_RE = re.compile(r"^\+?\d[\d\s\-()]{6,}$")
-
-def normalize_phone(s: str) -> str:
-    s = s.strip()
-    if s.startswith("00"):
-        s = "+" + s[2:]
-    return re.sub(r"[^\d+]", "", s)
+USER_STATE: Dict[int, Dict[str, Any]] = load_json(STATE_FILE, {})
 
 def set_state(chat_id: int, **kv):
     st = USER_STATE.setdefault(chat_id, {})
@@ -286,186 +117,146 @@ def save_customer(chat_id: int, user, package: Optional[str], phone: Optional[st
         "name": user.full_name,
         "package": package,
         "phone": phone,
-        "ts": _now_uae().isoformat(timespec="seconds"),
+        "lang": get_state(chat_id).get("lang", "ar"),
+        "ts_utc": _utcnow().isoformat(),
+        "ts_uae": _now_uae().isoformat(),
     }
     if extra:
         rec.update(extra)
-    try:
-        with HISTORY_FILE.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception as e:
-        logging.error("Failed to write customers.jsonl: %s", e)
+    save_jsonl(CUSTOMERS_FILE, rec)
 
-# ------------------------- I18N -------------------------
-BRAND = "AECyberTV"
-I18N = {
-    "pick_lang": {"ar": "اختر اللغة:", "en": "Choose your language:"},
-    "lang_ar": {"ar": "العربية", "en": "Arabic"},
-    "lang_en": {"ar": "English", "en": "English"},
+def save_trial(chat_id: int, user, package: str, phone: str) -> None:
+    rec = {
+        "chat_id": chat_id,
+        "user_id": user.id,
+        "username": user.username,
+        "name": user.full_name,
+        "package": package,
+        "phone": phone,
+        "lang": get_state(chat_id).get("lang", "ar"),
+        "ts_utc": _utcnow().isoformat(),
+        "ts_uae": _now_uae().isoformat(),
+    }
+    save_jsonl(TRIALS_FILE, rec)
+
+def save_support(rec: dict) -> None:
+    save_jsonl(SUPPORT_FILE, rec)
+
+def _persist_state() -> None:
+    save_json(STATE_FILE, USER_STATE)
+
+# ------------------------- I18N TEXTS -------------------------
+I18N: Dict[str, Dict[str, Any]] = {
     "welcome": {
-        "ar": f"مرحباً بك في {BRAND}!\n\nكيف نقدر نساعدك اليوم؟",
-        "en": f"Welcome to {BRAND}!\n\nHow can we help you today?",
+        "ar": "👋 أهلاً بك في AECyberTV!\nاختر ما تريد من القائمة:",
+        "en": "👋 Welcome to AECyberTV!\nPlease choose from the menu:",
+    },
+    "pick_lang": {
+        "ar": "🌐 اختر اللغة:",
+        "en": "🌐 Please choose your language:",
     },
 
-    # ===== Compact Players & Compatibility (Summary) =====
-    "more_info_title": {
-        "ar": "📺 تطبيقات AECyberTV | AECyberTV Players",
-        "en": "📺 AECyberTV Players | تطبيقات AECyberTV",
-    },
-    "more_info_body_compact": {
-        "ar": (
-            "📺 تطبيقات AECyberTV (رقم الخادم: 7765)\n\n"
-            "🍏 iPlay\n"
-            "• يعمل على أجهزة آيفون / آيباد / ماك (لاحقًا Apple TV)\n"
-            "• الأنسب لمستخدمي أجهزة آبل\n\n"
-            "🤖 S Player\n"
-            "• يعمل على أجهزة أندرويد / التلفزيونات الذكية / Firestick\n"
-            "• بعد التثبيت اضغط على شعار AECyberTV للاتصال\n\n"
-            "💠 000 Player\n"
-            "• يعمل على أجهزة iOS / أندرويد / التلفزيونات الذكية / الويب\n"
-            "• سريع وبسيط على جميع الأجهزة\n\n"
-            "ℹ️ روابط التحميل متوفرة في قسم «🔗 روابط التحميل»"
-        ),
-        "en": (
-            "📺 AECyberTV Players (Server: 7765)\n\n"
-            "🍏 iPlay\n"
-            "• Works on iPhone / iPad / Mac (Apple TV later)\n"
-            "• Best choice for Apple users\n\n"
-            "🤖 S Player\n"
-            "• Works on Android / Smart TVs / Firestick\n"
-            "• Tap the AECyberTV logo after installation to connect\n\n"
-            "💠 000 Player\n"
-            "• Works on iOS / Android / Smart TVs / Web\n"
-            "• Fast and simple across all devices\n\n"
-            "ℹ️ Download links available under “🔗 Download Links”"
-        ),
-    },
-
-    # ===== Download Links menu + per-player pages =====
-    "btn_players_links": {"ar": "🔗 روابط التحميل", "en": "🔗 Download Links"},
-    "players_links_title": {
-        "ar": "🔗 روابط التحميل | Download Links\nاختر التطبيق لرؤية الوصف والروابط:",
-        "en": "🔗 Download Links | روابط التحميل\nChoose a player to view description & links:",
-    },
-    "btn_player_iplay": {"ar": "🍏 iPlay", "en": "🍏 iPlay"},
-    "btn_player_splayer": {"ar": "🤖 S Player", "en": "🤖 S Player"},
-    "btn_player_000": {"ar": "💠 000 Player", "en": "💠 000 Player"},
-
-    # iPlay page
-    "player_iplay_body": {
-        "ar": (
-            "🍏 iPlay — يعمل على آيفون / آيباد / ماك (لاحقًا Apple TV)\n"
-            "استخدم نفس بيانات AECyberTV. مثالي لمستخدمي آبل.\n\n"
-            "App Store\n"
-            "https://apps.apple.com/us/app/iplay-hub/id6751518936"
-        ),
-        "en": (
-            "🍏 iPlay — iPhone / iPad / Mac (Apple TV soon)\n"
-            "Use your AECyberTV credentials. Great for Apple users.\n\n"
-            "App Store\n"
-            "https://apps.apple.com/us/app/iplay-hub/id6751518936"
-        ),
-    },
-
-    # S Player page
-    "player_splayer_body": {
-        "ar": (
-            "🤖 S Player — يعمل على أندرويد / التلفزيونات الذكية / Firestick\n"
-            "بعد التثبيت اضغط شعار AECyberTV للاتصال.\n\n"
-            "Google Play\n"
-            "https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
-            "Downloader (Firestick)\n"
-            "http://aftv.news/5653918"
-        ),
-        "en": (
-            "🤖 S Player — Android / TV / Firestick\n"
-            "Click the AECyberTV logo inside the app to connect.\n\n"
-            "Google Play\n"
-            "https://play.google.com/store/apps/details?id=com.splayer.iptv\n\n"
-            "Downloader (Firestick)\n"
-            "http://aftv.news/5653918"
-        ),
-    },
-
-    # 000 Player page
-    "player_000_body": {
-        "ar": (
-            "💠 000 Player — يعمل على iOS / أندرويد / التلفزيونات الذكية / الويب\n"
-            "سريع وبسيط على كل الأجهزة. Fast & simple on all devices.\n\n"
-            "iOS\n"
-            "https://apps.apple.com/us/app/000-player/id1665441224\n\n"
-            "Android / Smart TV\n"
-            "https://000player.com/download\n\n"
-            "Downloader (Firestick)\n"
-            "http://aftv.news/6913771\n\n"
-            "Web\n"
-            "https://my.splayer.in"
-        ),
-        "en": (
-            "💠 000 Player — iOS / Android / TV / Web\n"
-            "Fast & simple on all devices. سريع وبسيط على كل الأجهزة.\n\n"
-            "iOS\n"
-            "https://apps.apple.com/us/app/000-player/id1665441224\n\n"
-            "Android / Smart TV\n"
-            "https://000player.com/download\n\n"
-            "Downloader (Firestick)\n"
-            "http://aftv.news/6913771\n\n"
-            "Web\n"
-            "https://my.splayer.in"
-        ),
-    },
-
-    # Common UI
+    # Main menu buttons
     "btn_more_info": {"ar": "📋 معلومات", "en": "📋 More Info"},
     "btn_subscribe": {"ar": "💳 اشتراك", "en": "💳 Subscribe"},
     "btn_renew": {"ar": "♻️ تجديد", "en": "♻️ Renew"},
     "btn_trial": {"ar": "🧪 تجربة مجانية", "en": "🧪 Free Trial"},
-    "btn_support": {"ar": "🛟 دعم فني", "en": "🛟 Support"},
-    "btn_offers": {"ar": "🎁 العروض", "en": "🎁 Offers"},
+    "btn_support": {"ar": "🛟 دعم", "en": "🛟 Support"},
+    "btn_offers": {"ar": "🎁 عروض", "en": "🎁 Offers"},
     "btn_back": {"ar": "⬅️ رجوع", "en": "⬅️ Back"},
-    "subscribe_pick": {"ar": "اختر الباقة:", "en": "Please choose a package:"},
-    "terms": {
+
+    # More info
+    "more_info_title": {
+        "ar": "📋 نبذة عن AECyberTV",
+        "en": "📋 About AECyberTV",
+    },
+    "more_info_body_compact": {
         "ar": (
-            "✅ الشروط والملاحظات\n\n"
-            "• التفعيل بعد تأكيد الدفع.\n"
-            "• حساب واحد لكل جهاز ما لم تذكر الباقة غير ذلك.\n"
-            "• الاستخدام على عدة أجهزة قد يسبب تقطيع أو إيقاف الخدمة.\n"
-            "• لا توجد استرجاعات بعد التفعيل.\n\n"
-            "هل توافق على المتابعة؟"
+            "🌐 AECyberTV — خدمة ترفيه متكاملة:\n"
+            "• قنوات مباشرة (رياضة، أفلام، مسلسلات، أطفال وأكثر)\n"
+            "• مكتبة ضخمة من الأفلام والمسلسلات (VOD)\n"
+            "• جودة بث: SD / HD / FHD / 4K حسب الباقة والجهاز\n"
+            "• يعمل على أجهزة التلفزيون الذكية، أندرويد، آيفون، الكمبيوتر وغيرها.\n\n"
+            "لمعرفة روابط التطبيقات وطريقة التفعيل اضغط 👇"
         ),
         "en": (
-            "✅ Terms & Notes\n\n"
-            "• Activation after payment confirmation.\n"
-            "• One account per device unless package allows more.\n"
-            "• Using multiple devices may cause buffering or stop service.\n"
-            "• No refunds after activation.\n\n"
-            "Do you agree to proceed?"
+            "🌐 AECyberTV — All-in-one entertainment:\n"
+            "• Live channels (sports, movies, series, kids & more)\n"
+            "• Huge VOD library of movies and series\n"
+            "• Streaming quality: SD / HD / FHD / 4K depending on package/device\n"
+            "• Works on Smart TVs, Android, iPhone/iPad, and PC.\n\n"
+            "Tap below for apps & activation steps 👇"
         ),
     },
-    "btn_agree": {"ar": "✅ أوافق", "en": "✅ I Agree"},
-    "payment_instructions": {
-        "ar": "💳 الدفع\n\nاضغط (ادفع الآن) لإتمام الدفع. ثم ارجع واضغط (دفعت).",
-        "en": "💳 Payment\n\nTap (Pay Now) to complete payment. Then return and press (I Paid).",
+
+    "players_links_title": {
+        "ar": "📺 تطبيقات التشغيل والروابط الرسمية",
+        "en": "📺 Players & official links",
     },
-    "btn_pay_now": {"ar": "🔗 ادفع الآن", "en": "🔗 Pay Now"},
-    "btn_paid": {"ar": "✅ دفعت", "en": "✅ I Paid"},
-    "thank_you": {
-        "ar": f"🎉 شكراً لاختيارك {BRAND}!",
-        "en": f"🎉 Thank you for choosing {BRAND}!",
+    "players_links_body": {
+        "ar": "اختر نوع جهازك للحصول على روابط التطبيقات:",
+        "en": "Choose your device type to get the player links:",
     },
-    "breadcrumb_sel": {"ar": "🧩 تم حفظ اختيارك: {pkg} ({price} درهم)", "en": "🧩 Selection saved: {pkg} ({price} AED)"},
-    "breadcrumb_agree": {"ar": "✅ وافق على المتابعة: {pkg}", "en": "✅ Agreed to proceed: {pkg}"},
-    "breadcrumb_paid": {
-        "ar": "🧾 تم الضغط على (دفعت)\n• الباقة: {pkg}\n• الوقت: {ts}",
-        "en": "🧾 Payment confirmation clicked\n• Package: {pkg}\n• Time: {ts}",
-        "en_short": "🧾 I Paid • {pkg} • {ts}",
+
+    # Player bodies
+    "player_iplay_body": {
+        "ar": (
+            "🍏 iPlay (iPhone / iPad / Mac):\n"
+            "• iPlay – لأجهزة iPhone / iPad / Mac\n\n"
+            "🌐 الموقع الرسمي:\n"
+            "• aecybertv.xyz\n\n"
+            "🔢 رقم الخادم (Host/DNS): 7765"
+        ),
+        "en": (
+            "🍏 iPlay (iPhone / iPad / Mac):\n"
+            "• iPlay for iPhone / iPad / Mac\n\n"
+            "🌐 Official website:\n"
+            "• aecybertv.xyz\n\n"
+            "🔢 Server (Host/DNS): 7765"
+        ),
     },
-    "phone_request": {
-        "ar": "📞 شارك رقم هاتفك للتواصل.\nاضغط (مشاركة رقمي) أو اكتب الرقم مع رمز الدولة (مثل +9715xxxxxxx).",
-        "en": "📞 Please share your phone number.\nTap (Share my number) or type it including country code (e.g., +9715xxxxxxx).",
+    "player_splayer_body": {
+        "ar": (
+            "📺 SPlayer (Android TV / Fire Stick):\n"
+            "• Android / Smart TV: play.google.com/store/apps/details?id=com.player.iptv\n"
+            "• Firestick / Android TV (Downloader): aftv.news/6913771\n\n"
+            "🌐 الموقع الرسمي: aecybertv.xyz\n🔢 رقم الخادم (Host/DNS): 7765"
+        ),
+        "en": (
+            "📺 SPlayer (Android TV / Fire Stick):\n"
+            "• Android / Smart TV: play.google.com/store/apps/details?id=com.player.iptv\n"
+            "• Firestick / Android TV (Downloader): aftv.news/6913771\n\n"
+            "🌐 Official website: aecybertv.xyz\n🔢 Server (Host/DNS): 7765"
+        ),
     },
-    "btn_share_phone": {"ar": "📲 مشاركة رقمي", "en": "📲 Share my number"},
-    "phone_saved": {"ar": "✅ تم حفظ رقمك. سنتواصل معك قريباً.", "en": "✅ Number saved. We’ll contact you soon."},
+    "player_000_body": {
+        "ar": (
+            "📺 000 Player (Android / Smart TV):\n"
+            "• Google Play: https://play.google.com/store/apps/details?id=com.player.iptv\n"
+            "• Web Player: https://my.splayer.in\n\n"
+            "🌐 الموقع الرسمي: aecybertv.xyz\n🔢 رقم الخادم (Host/DNS): 7765"
+        ),
+        "en": (
+            "📺 000 Player (Android / Smart TV):\n"
+            "• Google Play: https://play.google.com/store/apps/details?id=com.player.iptv\n"
+            "• Web Player: https://my.splayer.in\n\n"
+            "🌐 Official website: aecybertv.xyz\n🔢 Server (Host/DNS): 7765"
+        ),
+    },
+
+    # Subscribe / Renew
+    "subscribe_pick": {
+        "ar": "💳 اختر الباقة التي تريد الاشتراك أو التجديد لها:",
+        "en": "💳 Choose the package you want to subscribe/renew:",
+    },
+    "ask_phone": {
+        "ar": "📱 أرسل رقم هاتفك (أو شارك جهة الاتصال) للتواصل حول التفعيل:",
+        "en": "📱 Please send your phone number (or share your contact) so we can help with activation:",
+    },
+    "phone_saved": {
+        "ar": "✅ تم حفظ رقم الهاتف.",
+        "en": "✅ Phone number saved.",
+    },
 
     # Offers UI texts
     "offers_title": {"ar": "🎁 العروض المتاحة الآن", "en": "🎁 Available offers now"},
@@ -483,7 +274,10 @@ I18N = {
         "ar": "🧪 اختر باقة للتجربة المجانية (مرة كل 30 يومًا لكل رقم ولكل باقة):",
         "en": "🧪 Choose a package for the free trial (once every 30 days per phone per package):",
     },
-    "trial_recorded": {"ar": "✅ تم تسجيل طلب التجربة. سيتم التواصل معك لإرسال البيانات.", "en": "✅ Trial request recorded. We’ll contact you to send credentials."},
+    "trial_recorded": {
+        "ar": "✅ تم تسجيل طلب التجربة. سيتم التواصل معك لإرسال بيانات الدخول.",
+        "en": "✅ Trial request recorded. We’ll contact you to send credentials.",
+    },
     "trial_cooldown": {
         "ar": "❗️ تم استخدام تجربة باقة «{pkg}» مؤخرًا لهذا الرقم. اطلب تجربة جديدة بعد ~{days} يومًا.",
         "en": "❗️ A trial for “{pkg}” was used recently for this number. Please try again in ~{days} days.",
@@ -492,22 +286,32 @@ I18N = {
     # Support (Arabic & English labels)
     "support_pick": {"ar": "🛟 اختر نوع المشكلة:", "en": "🛟 Choose an issue:"},
     "support_login": {"ar": "🚪 تسجيل الدخول/التفعيل", "en": "🚪 Login/Activation"},
-    "support_buffer": {"ar": "🌐 السرعة/التقطيع", "en": "🌐 Buffering / Speed"},
-    "support_channels": {"ar": "📺 القنوات المفقودة", "en": "📺 Missing Channel"},
-    "support_billing": {"ar": "💳 الفوترة/الدفع", "en": "💳 Billing / Payment"},
-    "support_other": {"ar": "🧩 أخرى", "en": "🧩 Other"},
-    "support_detail_prompt": {
-        "ar": "اشرح المشكلة بالتفصيل.\nيمكنك إرسال لقطة شاشة إن وجدت، أو أرسل /done للإرسال.",
-        "en": "Describe the issue in detail.\nYou may send a screenshot if available, or send /done to submit.",
+    "support_channels": {"ar": "📺 مشكلة بالقنوات", "en": "📺 Channels issue"},
+    "support_payment": {"ar": "💳 مشكلة بالدفع/الاشتراك", "en": "💳 Payment/Subscription"},
+    "support_other": {"ar": "❓ أخرى", "en": "❓ Other"},
+
+    "support_ask_details": {
+        "ar": "✏️ اكتب تفاصيل المشكلة (بإمكانك إضافة صور بعد ذلك):",
+        "en": "✏️ Please describe the issue (you can add screenshots afterwards):",
     },
-    "support_saved": {"ar": "✅ تم تسجيل البلاغ وسنتواصل معك قريبًا.", "en": "✅ Your support ticket is recorded. We will contact you soon."},
+    "support_ask_screenshot": {
+        "ar": "📷 أرسل لقطة شاشة (اختياري)، أو اكتب /done لإنهاء الطلب.",
+        "en": "📷 Send a screenshot (optional), or type /done to submit the ticket.",
+    },
+    "support_saved": {
+        "ar": "✅ تم تسجيل بلاغ الدعم. سيتم التواصل معك قريبًا.",
+        "en": "✅ Your support request has been recorded. We’ll contact you soon.",
+    },
 }
 
 def t(chat_id: int, key: str) -> str:
-    lang = get_state(chat_id).get("lang", "ar")
+    st = get_state(chat_id)
+    lang = st.get("lang", "ar")
     val = I18N.get(key)
+    if val is None:
+        return key
     if isinstance(val, dict):
-        return val.get(lang, val.get("en", ""))
+        return val.get(lang, val.get("en", key))
     return str(val)
 
 # ------------------------- KEYBOARDS -------------------------
@@ -535,10 +339,10 @@ def more_info_summary_kb(chat_id: int) -> InlineKeyboardMarkup:
 
 def players_links_kb(chat_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(t(chat_id, "btn_player_iplay"), callback_data="player_links|iplay")],
-        [InlineKeyboardButton(t(chat_id, "btn_player_splayer"), callback_data="player_links|splayer")],
-        [InlineKeyboardButton(t(chat_id, "btn_player_000"), callback_data="player_links|000")],
-        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="more_info")]
+        [InlineKeyboardButton("🍏 iPlay (iPhone / iPad / Mac)", callback_data="player_links|iplay")],
+        [InlineKeyboardButton("📺 SPlayer (Android TV / Fire Stick)", callback_data="player_links|splayer")],
+        [InlineKeyboardButton("📺 000 Player (Android / Smart TV)", callback_data="player_links|000")],
+        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_more_info")]
     ])
 
 def packages_kb() -> InlineKeyboardMarkup:
@@ -548,167 +352,123 @@ def packages_kb() -> InlineKeyboardMarkup:
 
 def agree_kb(chat_id: int, pkg_name: str, reason: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(t(chat_id, "btn_agree"), callback_data=f"agree|{reason}|{pkg_name}")],
-        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")],
-    ])
-
-def pay_kb(chat_id: int, pkg_name: str, reason: str) -> InlineKeyboardMarkup:
-    pay_url = PACKAGES[pkg_name]["payment_url"]
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(t(chat_id, "btn_pay_now"), url=pay_url)],
-        [InlineKeyboardButton(t(chat_id, "btn_paid"), callback_data=f"paid|{reason}|{pkg_name}")],
-        [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")],
+        [InlineKeyboardButton("✅ OK", callback_data=f"agree|{reason}|{pkg_name}"),
+         InlineKeyboardButton("⬅️ Back", callback_data="back_home")]
     ])
 
 def trial_packages_kb() -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(f"{pkg} — {PACKAGES[pkg]['trial_hours']}h", callback_data=f"trial_pkg|{pkg}")]
-            for pkg in PACKAGES.keys()]
+    rows = [
+        [InlineKeyboardButton(pkg, callback_data=f"trial_pkg|{pkg}")]
+        for pkg in PACKAGES.keys()
+    ]
     rows.append([InlineKeyboardButton("⬅️ Back", callback_data="back_home")])
     return InlineKeyboardMarkup(rows)
 
 def support_issues_kb(chat_id: int) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(t(chat_id, "support_login"), callback_data="support_issue|login")],
-            [InlineKeyboardButton(t(chat_id, "support_buffer"), callback_data="support_issue|buffer")],
             [InlineKeyboardButton(t(chat_id, "support_channels"), callback_data="support_issue|channels")],
-            [InlineKeyboardButton(t(chat_id, "support_billing"), callback_data="support_issue|billing")],
+            [InlineKeyboardButton(t(chat_id, "support_payment"), callback_data="support_issue|payment")],
             [InlineKeyboardButton(t(chat_id, "support_other"), callback_data="support_issue|other")],
             [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")]]
     return InlineKeyboardMarkup(rows)
 
-def phone_request_kb(chat_id: int) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton(t(chat_id, "btn_share_phone"), request_contact=True)]],
-        resize_keyboard=True, one_time_keyboard=True, input_field_placeholder="Tap to share, or type your number…"
-    )
+# ------------------------- PACKAGES -------------------------
+PACKAGES: Dict[str, Dict[str, Any]] = {
+    "AECyberTV Kids": {
+        "code": "kids",
+        "price_aed": 70,
+        "trial_hours": 8,
+        "details_en": "\n• Kids-safe channels\n• Cartoons & Educational shows\n• Works on 1 device\n",
+        "details_ar": "\n• قنوات للأطفال\n• كرتون وبرامج تعليمية\n• يعمل على جهاز واحد\n",
+        "payment_url": "https://buy.stripe.com/3cIbJ29I94yA92g2AV5kk04",
+    },
+    "AECyberTV Casual": {
+        "code": "casual",
+        "price_aed": 75,
+        "trial_hours": 24,
+        "details_en": "\n• 10,000+ Live Channels\n• 70,000+ Movies (VOD)\n• 12,000+ Series\n• Works on 1 device\n",
+        "details_ar": "\n• أكثر من 10,000 قناة مباشرة\n• أكثر من 70,000 فيلم (VOD)\n• أكثر من 12,000 مسلسل\n• يعمل على جهاز واحد\n",
+        "payment_url": "https://buy.stripe.com/your_casual_link",
+    },
+    "AECyberTV Executive": {
+        "code": "executive",
+        "price_aed": 200,
+        "trial_hours": 24,
+        "details_en": "\n• 16,000+ Live Channels\n• 24,000+ Movies (VOD)\n• 14,000+ Series\n• Works on 2 devices\n",
+        "details_ar": "\n• أكثر من 16,000 قناة مباشرة\n• أكثر من 24,000 فيلم (VOD)\n• أكثر من 14,000 مسلسل\n• يعمل على جهازين\n",
+        "payment_url": "https://buy.stripe.com/your_executive_link",
+    },
+    "AECyberTV Premium": {
+        "code": "premium",
+        "price_aed": 250,
+        "trial_hours": 24,
+        "details_en": "\n• All Executive content\n• Extra sports & premium channels\n• Works on 3 devices\n",
+        "details_ar": "\n• كل محتوى الباقة التنفيذية\n• قنوات رياضية ومميزة إضافية\n• يعمل على 3 أجهزة\n",
+        "payment_url": "https://buy.stripe.com/your_premium_link",
+    },
+}
 
-# Offer package selection keyboard
-def offer_packages_kb(idx: int) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton("Casual", callback_data=f"offer_pkg|{idx}|Casual"),
-         InlineKeyboardButton("Executive", callback_data=f"offer_pkg|{idx}|Executive")],
-        [InlineKeyboardButton("Premium", callback_data=f"offer_pkg|{idx}|Premium"),
-         InlineKeyboardButton("Kids", callback_data=f"offer_pkg|{idx}|Kids")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="offers")]
-    ]
-    return InlineKeyboardMarkup(rows)
+# ------------------------- OFFERS -------------------------
+OFFERS_ALL: List[Dict[str, Any]] = []
+
+def build_embedded_offers() -> List[Dict[str, Any]]:
+    if OFFERS_FILE.exists():
+        try:
+            return json.loads(OFFERS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
+
+def active_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    acts: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if _parse_iso(o["start_at"]) <= now <= _parse_iso(o["end_at"]):
+                acts.append(o)
+        except Exception:
+            continue
+    acts.sort(key=lambda x: (-(int(x.get("priority", 0))), x.get("start_at", "")))
+    return acts
+
+def upcoming_offers(now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    if now is None:
+        now = _utcnow()  # UTC
+    ups: List[Dict[str, Any]] = []
+    for o in OFFERS_ALL:
+        try:
+            if _parse_iso(o["start_at"]) > now:
+                ups.append(o)
+        except Exception:
+            continue
+    ups.sort(key=lambda x: _parse_iso(x["start_at"]))
+    return ups
+
+def _fmt_offer(o: Dict[str, Any], lang: str) -> str:
+    title = o["title_ar"] if lang == "ar" else o["title_en"]
+    desc = o["desc_ar"] if lang == "ar" else o["desc_en"]
+    return f"{title}\n{desc}\nFrom: {o['start_at']} To: {o['end_at']}"
 
 # ------------------------- HELPERS -------------------------
-async def safe_edit_or_send(query, context, chat_id: int, text: str,
-                            kb, html: bool = False, no_preview: bool = False) -> None:
-    """Edits callback message OR sends new message. If kb is ReplyKeyboardMarkup, send only a new message."""
-    try:
-        if isinstance(kb, ReplyKeyboardMarkup):
-            await context.bot.send_message(
-                chat_id=chat_id, text=text, reply_markup=kb,
-                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview
-            )
-        else:
-            await query.edit_message_text(
-                text, reply_markup=kb if isinstance(kb, InlineKeyboardMarkup) else None,
-                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview,
-            )
-    except Exception as e:
-        logging.warning("safe_edit_or_send fallback: %s", e)
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id, text=text, reply_markup=kb,
-                parse_mode="HTML" if html else None, disable_web_page_preview=no_preview
-            )
-        except Exception as e2:
-            logging.error("send_message failed: %s", e2)
-
-def pkg_details_for_lang(pkg_name: str, lang: str) -> str:
-    pkg = PACKAGES.get(pkg_name)
-    if not pkg:
-        return ""
-    return pkg["details_ar"] if lang == "ar" else pkg["details_en"]
-
 def _is_admin(user_id: int) -> bool:
-    try:
-        return ADMIN_CHAT_ID is not None and int(ADMIN_CHAT_ID) == int(user_id)
-    except Exception:
-        return False
+    return ADMIN_CHAT_ID is not None and user_id == ADMIN_CHAT_ID
 
-def _fmt_offer(o: dict, lang: str) -> str:
-    title = o["title_ar"] if lang == "ar" else o["title_en"]
-    s_uae = _parse_iso(o["start_at"]).astimezone(DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    e_uae = _parse_iso(o["end_at"]).astimezone(DUBAI_TZ).strftime("%Y-%m-%d %H:%M:%S")
-    return f"• {title}\n  🕒 {s_uae} → {e_uae} (UAE)"
+async def safe_edit_or_send(q, context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                            text: str, kb: Optional[InlineKeyboardMarkup] = None,
+                            no_preview: bool = False):
+    try:
+        if q and q.message:
+            await q.message.edit_text(text, reply_markup=kb, disable_web_page_preview=no_preview)
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, disable_web_page_preview=no_preview)
+    except Exception:
+        await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb, disable_web_page_preview=no_preview)
 
 async def _send_phone_prompt(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Single, non-duplicated phone prompt."""
-    await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "phone_request"), reply_markup=phone_request_kb(chat_id))
-
-# ------------------------- FLOWS (post-phone continuation) -------------------------
-async def _post_phone_continuations(update: Update, context: ContextTypes.DEFAULT_TYPE, phone: str):
-    chat_id = update.effective_chat.id
-    st = get_state(chat_id)
-    reason = st.get("awaiting_phone_reason")
-
-    # SUBSCRIBE
-    if reason == "subscribe":
-        await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
-        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-        return
-
-    # OFFER
-    if reason == "offer":
-        await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
-        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-        return
-
-    # RENEW (username already captured)
-    if reason == "renew":
-        await update.message.reply_text(t(chat_id, "thank_you"), reply_markup=main_menu_kb(chat_id))
-        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, awaiting_username=False, awaiting_username_reason=None)
-        return
-
-    # TRIAL (per phone PER PACKAGE cooldown 30d)
-    if reason == "trial":
-        pkg = st.get("trial_pkg")
-        last_ok = None
-        for r in iter_jsonl(TRIALS_FILE):
-            if r.get("phone") == phone and r.get("package") == pkg:
-                try:
-                    when = datetime.fromisoformat(r.get("created_at"))
-                except Exception:
-                    when = _now_uae()
-                if not last_ok or when > last_ok:
-                    last_ok = when
-        if last_ok and (_now_uae() - last_ok) < timedelta(days=30):
-            days_left = 30 - (_now_uae() - last_ok).days
-            msg = I18N["trial_cooldown"]["ar" if get_state(chat_id).get("lang", "ar") == "ar" else "en"].format(pkg=pkg, days=days_left)
-            await update.message.reply_text(msg, reply_markup=main_menu_kb(chat_id))
-            set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, trial_pkg=None)
-            return
-
-        hours = PACKAGES[pkg]["trial_hours"] if pkg in PACKAGES else 0
-        tid = save_jsonl(TRIALS_FILE, {
-            "tg_chat_id": chat_id,
-            "tg_user_id": update.effective_user.id,
-            "tg_username": update.effective_user.username,
-            "phone": phone,
-            "package": pkg,
-            "trial_hours": hours,
-            "created_at": _now_uae().isoformat(),
-            "status": "open"
-        })
-        await update.message.reply_text(t(chat_id, "trial_recorded"), reply_markup=main_menu_kb(chat_id))
-        if ADMIN_CHAT_ID:
-            await context.bot.send_message(
-                chat_id=int(ADMIN_CHAT_ID),
-                text=(f"🧪 NEW TRIAL REQUEST\nTicket #{tid}\n"
-                      f"User: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})\n"
-                      f"Phone: {phone}\nPackage: {pkg}\nHours: {hours}")
-            )
-        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, trial_pkg=None)
-        return
-
-    # SUPPORT
-    if reason == "support":
-        await update.message.reply_text(t(chat_id, "support_saved"), reply_markup=main_menu_kb(chat_id))
-        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-        return
+    btn = KeyboardButton(text=t(chat_id, "ask_phone"), request_contact=True)
+    kb = ReplyKeyboardMarkup([[btn]], resize_keyboard=True, one_time_keyboard=True)
+    await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "ask_phone"), reply_markup=kb)
 
 # ------------------------- HANDLERS -------------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -718,6 +478,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await start(update, context)
 
+async def packages_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show subscription packages and start subscribe flow (same as Subscribe button)."""
+    chat_id = update.effective_chat.id
+    # Reset flow and show packages
+    set_state(chat_id, flow="subscribe", awaiting_phone=False, awaiting_phone_reason=None)
+    await update.message.reply_text(t(chat_id, "subscribe_pick"), reply_markup=packages_kb())
+
+async def renew_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start renewal flow (same as Renew button)."""
+    chat_id = update.effective_chat.id
+    set_state(chat_id, flow="renew", awaiting_phone=False, awaiting_phone_reason=None)
+    await update.message.reply_text(t(chat_id, "subscribe_pick"), reply_markup=packages_kb())
+
+async def trial_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start free trial flow (same as Trial button)."""
+    chat_id = update.effective_chat.id
+    set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
+    await update.message.reply_text(t(chat_id, "trial_pick"), reply_markup=trial_packages_kb())
+
+async def support_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Open support ticket flow (same as Support button)."""
+    chat_id = update.effective_chat.id
+    set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
+    await update.message.reply_text(t(chat_id, "support_pick"), reply_markup=support_issues_kb(chat_id))
+
+async def offers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show active offers (same as Offers button)."""
+    chat_id = update.effective_chat.id
+    acts = active_offers()
+    if not acts:
+        await update.message.reply_text(t(chat_id, "offers_none"))
+        return
+    rows = []
+    lang = get_state(chat_id).get("lang", "ar")
+    for idx, o in enumerate(acts):
+        title = o["title_ar"] if lang == "ar" else o["title_en"]
+        rows.append([InlineKeyboardButton(title, callback_data=f"offer_act|{idx}")])
+    rows.append([InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="back_home")])
+    await update.message.reply_text(t(chat_id, "offers_title"), reply_markup=InlineKeyboardMarkup(rows))
+
 # Admin/utility commands
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update.effective_user.id):
@@ -725,7 +525,8 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     mode = "webhook" if WEBHOOK_URL else "polling"
     await update.message.reply_text(
-        f"✅ Status\nMode: {mode}\nUTC: {_utcnow().strftime('%Y-%m-%d %H:%M:%S')}\nUAE: {_now_uae().strftime('%Y-%m-%d %H:%M:%S')}\nActive offers: {len(active_offers())}"
+        f"✅ Status\nMode: {mode}\nUTC: {_utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"UAE: {_now_uae().strftime('%Y-%m-%d %H:%M:%S')}\nActive offers: {len(active_offers())}"
     )
 
 async def offers_now_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -760,143 +561,107 @@ async def offer_reload_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     global OFFERS_ALL
     OFFERS_ALL = build_embedded_offers()
-    await update.message.reply_text("Offers reloaded.")
+    await update.message.reply_text(f"Reloaded offers. Now: {len(OFFERS_ALL)} offers.")
 
 async def debug_id_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(f"Your Telegram user id: {update.effective_user.id}")
+    chat = update.effective_chat
+    user = update.effective_user
+    await update.message.reply_text(
+        f"Chat ID: {chat.id}\n"
+        f"User ID: {user.id}\n"
+        f"Username: @{user.username or 'N/A'}"
+    )
 
-# Text / Contact / Photos
-async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+# ------------------------- SUPPORT / DONE -------------------------
+async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     st = get_state(chat_id)
-    txt = (update.message.text or "").strip()
-
-    # Support details flow
-    if context.user_data.get("support_stage") == "await_details":
-        context.user_data["support_details"] = txt
-        context.user_data["support_stage"] = "await_optional_screenshot"
-        await update.message.reply_text(t(chat_id, "support_detail_prompt"))
+    if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
+        context.user_data["support_stage"] = None
+        context.user_data["support_details"] = None
+        context.user_data["support_photos"] = []
+        context.user_data["support_issue_code"] = None
+        await update.message.reply_text(t(chat_id, "support_saved"), reply_markup=ReplyKeyboardRemove())
+        # notify admin
+        if ADMIN_CHAT_ID:
+            await context.bot.send_message(
+                chat_id=int(ADMIN_CHAT_ID),
+                text=f"🛟 SUPPORT TICKET CLOSED via /done\nUser: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})"
+            )
         return
+    await update.message.reply_text("No active support ticket.", reply_markup=ReplyKeyboardRemove())
 
-    # Username flow (renew)
-    if st.get("awaiting_username") and st.get("awaiting_username_reason") == "renew":
-        set_state(chat_id, awaiting_username=False)
-        save_customer(chat_id, update.effective_user, st.get("package"), st.get("phone"), extra={"username_for_renew": txt})
-        await update.message.reply_text(t(chat_id, "username_saved"))
-        set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="renew")
-        await _send_phone_prompt(context, chat_id)
-        return
-
-    # Phone capture by text
-    if st.get("awaiting_phone") and txt:
-        if PHONE_RE.match(txt):
-            phone = normalize_phone(txt)
-            set_state(chat_id, phone=phone)
-            save_customer(chat_id, update.effective_user, st.get("package"), phone)
-            if ADMIN_CHAT_ID:
-                try:
-                    await context.bot.send_message(
-                        chat_id=ADMIN_CHAT_ID,
-                        text=(f"📞 Phone captured\n"
-                              f"User: @{update.effective_user.username or 'N/A'} (id: {update.effective_user.id})\n"
-                              f"Name: {update.effective_user.full_name}\n"
-                              f"Package: {st.get('package')}\n"
-                              f"Phone: {phone}\n"
-                              f"Reason: {st.get('awaiting_phone_reason')}")
-                    )
-                except Exception as e:
-                    logging.error("Admin notify (phone) failed: %s", e)
-            await update.message.reply_text(t(chat_id, "phone_saved"), reply_markup=ReplyKeyboardRemove())
-            await _post_phone_continuations(update, context, phone)
-            set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
-            return
-        else:
-            await update.message.reply_text("❗️Invalid number. Include country code (e.g., +9715xxxxxxx).",
-                                            reply_markup=phone_request_kb(chat_id))
-            return
-
-    # Default: language or menu
-    if "lang" not in st:
-        await update.message.reply_text(t(chat_id, "pick_lang"), reply_markup=lang_kb())
-    else:
-        await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
-
+# ------------------------- MESSAGE HANDLERS -------------------------
 async def on_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     contact: Contact = update.message.contact
-    phone = normalize_phone(contact.phone_number or "")
+    phone = contact.phone_number
     st = get_state(chat_id)
-    set_state(chat_id, phone=phone)
-    save_customer(chat_id, update.effective_user, st.get("package"), phone)
-
-    if ADMIN_CHAT_ID:
-        try:
+    flow = st.get("flow")
+    if st.get("awaiting_phone_reason") == "trial":
+        pkg = st.get("trial_pkg")
+        if pkg not in PACKAGES:
+            await update.message.reply_text("Package not found.", reply_markup=ReplyKeyboardRemove())
+            return
+        save_trial(chat_id, update.effective_user, pkg, phone)
+        await update.message.reply_text(t(chat_id, "trial_recorded"), reply_markup=ReplyKeyboardRemove())
+        if ADMIN_CHAT_ID:
             await context.bot.send_message(
-                chat_id=ADMIN_CHAT_ID,
-                text=(f"📞 Phone captured via Contact\n"
-                      f"User: @{update.effective_user.username or 'N/A'} (id: {update.effective_user.id})\n"
-                      f"Name: {update.effective_user.full_name}\n"
-                      f"Package: {st.get('package')}\n"
-                      f"Phone: {phone}\n"
-                      f"Reason: {st.get('awaiting_phone_reason')}")
+                chat_id=int(ADMIN_CHAT_ID),
+                text=(f"🧪 TRIAL (contact share)\nUser: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})\n"
+                      f"Phone: {phone}\nPackage: {pkg}")
             )
-        except Exception as e:
-            logging.error("Admin notify (contact) failed: %s", e)
+        set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None, trial_pkg=None)
+        return
 
+    save_customer(chat_id, update.effective_user, flow, phone)
     await update.message.reply_text(t(chat_id, "phone_saved"), reply_markup=ReplyKeyboardRemove())
-    await _post_phone_continuations(update, context, phone)
+    if ADMIN_CHAT_ID:
+        await context.bot.send_message(
+            chat_id=int(ADMIN_CHAT_ID),
+            text=(f"💳 CUSTOMER (contact share)\nUser: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})\n"
+                  f"Phone: {phone}\nFlow: {flow or 'N/A'}")
+        )
     set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None)
 
 async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     if context.user_data.get("support_stage") == "await_optional_screenshot":
-        photos = update.message.photo or []
-        if photos:
-            best = photos[-1].file_id
-            context.user_data.setdefault("support_photos", []).append(best)
-        await update.message.reply_text("✅ Screenshot received. Send more or /done to submit.")
+        context.user_data.setdefault("support_photos", []).append(update.message.photo[-1].file_id)
+        await update.message.reply_text("✅ Screenshot received. You can send more or type /done to finish.")
+        return
+    await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
+
+async def any_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    txt = (update.message.text or "").strip()
+    st = get_state(chat_id)
+
+    if st.get("awaiting_username_reason") == "renew":
+        set_state(chat_id, awaiting_username=False, awaiting_username_reason=None)
+        save_customer(chat_id, update.effective_user, "renew", None, extra={"username": txt})
+        await update.message.reply_text(t(chat_id, "username_saved"), reply_markup=ReplyKeyboardRemove())
+        if ADMIN_CHAT_ID:
+            await context.bot.send_message(
+                chat_id=int(ADMIN_CHAT_ID),
+                text=(f"♻️ RENEW (username)\nUser: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})\n"
+                      f"Username: {txt}")
+            )
         return
 
-async def done_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    if context.user_data.get("support_stage") in ("await_details", "await_optional_screenshot"):
-        tid = save_jsonl(SUPPORT_FILE, {
-            "tg_chat_id": chat_id,
-            "tg_user_id": update.effective_user.id,
-            "tg_username": update.effective_user.username,
-            "details": context.user_data.get("support_details"),
-            "photos": context.user_data.get("support_photos", []),
-            "created_at": _now_uae().isoformat(),
-            "status": "open",
-            "issue_code": context.user_data.get("support_issue_code"),
-        })
-        if ADMIN_CHAT_ID:
-            pics = context.user_data.get("support_photos", [])
-            text = (f"🛟 NEW SUPPORT TICKET\n"
-                    f"Ticket #{tid}\n"
-                    f"Issue: {context.user_data.get('support_issue_code')}\n"
-                    f"User: @{update.effective_user.username or 'N/A'} ({update.effective_user.id})\n"
-                    f"Details: {context.user_data.get('support_details')}\n"
-                    f"Photos: {len(pics)}")
-            await context.bot.send_message(chat_id=int(ADMIN_CHAT_ID), text=text)
-            if pics:
-                media = [InputMediaPhoto(p) for p in pics[:10]]
-                try:
-                    await context.bot.send_media_group(chat_id=int(ADMIN_CHAT_ID), media=media)
-                except Exception:
-                    pass
-        # clear stages then ask phone
-        context.user_data["support_stage"] = None
-        context.user_data["support_details"] = None
-        context.user_data["support_photos"] = []
-        context.user_data["support_issue_code"] = None
+    if context.user_data.get("support_stage") == "await_details":
+        context.user_data["support_details"] = txt
+        context.user_data["support_stage"] = "await_optional_screenshot"
+        await update.message.reply_text(t(chat_id, "support_ask_screenshot"))
+        return
 
-        set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="support")
-        await _send_phone_prompt(context, chat_id)
-    else:
-        await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
+    if txt == "/start":
+        await start(update, context)
+        return
 
-# Callback buttons
+    await update.message.reply_text(t(chat_id, "welcome"), reply_markup=main_menu_kb(chat_id))
+
+# ------------------------- CALLBACK HANDLER -------------------------
 async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     q = update.callback_query
     await q.answer()
@@ -914,10 +679,6 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
         return
 
-    if "lang" not in st:
-        await safe_edit_or_send(q, context, chat_id, t(chat_id, "pick_lang"), lang_kb())
-        return
-
     if data == "back_home":
         set_state(chat_id, awaiting_phone=False, awaiting_phone_reason=None,
                   awaiting_username=False, awaiting_username_reason=None, flow=None)
@@ -932,6 +693,11 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if data == "players_links":
         await safe_edit_or_send(q, context, chat_id, t(chat_id, "players_links_title"), players_links_kb(chat_id))
+        return
+
+    if data == "back_more_info":
+        text = t(chat_id, "more_info_title") + "\n\n" + t(chat_id, "more_info_body_compact")
+        await safe_edit_or_send(q, context, chat_id, text, more_info_summary_kb(chat_id), no_preview=True)
         return
 
     if data.startswith("player_links|"):
@@ -989,23 +755,20 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         _, code = data.split("|", 1)
         tid = save_jsonl(SUPPORT_FILE, {
-            "tg_chat_id": chat_id,
-            "tg_user_id": user.id,
-            "tg_username": user.username,
+            "chat_id": chat_id,
+            "user_id": user.id,
+            "username": user.username,
+            "name": user.full_name,
             "issue_code": code,
-            "status": "open",
-            "created_at": _now_uae().isoformat(),
+            "ts_utc": _utcnow().isoformat(),
+            "ts_uae": _now_uae().isoformat(),
         })
-        context.user_data["support_ticket_seed"] = tid
-        context.user_data["support_issue_code"] = code
         context.user_data["support_stage"] = "await_details"
+        context.user_data["support_issue_code"] = code
+        context.user_data["support_details"] = None
+        context.user_data["support_photos"] = []
 
-        try:
-            await q.edit_message_reply_markup(reply_markup=None)
-        except Exception:
-            pass
-        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "support_detail_prompt"))
-
+        await safe_edit_or_send(q, context, chat_id, t(chat_id, "support_ask_details"), None)
         if ADMIN_CHAT_ID:
             await context.bot.send_message(
                 chat_id=int(ADMIN_CHAT_ID),
@@ -1040,144 +803,16 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if idx < 0 or idx >= len(acts):
             await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
             return
-        off = acts[idx]
-        now = _utcnow()
-        if not (_parse_iso(off["start_at"]) <= now <= _parse_iso(off["end_at"])):
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
+        offer = acts[idx]
         lang = get_state(chat_id).get("lang", "ar")
-        title = off["title_ar"] if lang == "ar" else off["title_en"]
-        body  = off["body_ar"]  if lang == "ar" else off["body_en"]
-        # Add note that offers may change at any time (already in body)
-        text = f"🛍️ <b>{title}</b>\n\n{body}\n\n{t(chat_id, 'terms')}\n\nPlease choose a package:"
-        await safe_edit_or_send(q, context, chat_id, text, offer_packages_kb(idx), html=True)
+        text = _fmt_offer(offer, lang)
+        await safe_edit_or_send(q, context, chat_id, text, InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(chat_id, "btn_back"), callback_data="offers")]
+        ]))
         return
-
-    # user chooses which package inside the selected offer
-    if data.startswith("offer_pkg|"):
-        parts = data.split("|", 2)
-        if len(parts) != 3:
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-        _, sidx, pkg_key = parts
-        try:
-            idx = int(sidx)
-        except Exception:
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-
-        acts = active_offers()
-        if idx < 0 or idx >= len(acts):
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-
-        off = acts[idx]
-        ctas: Dict[str, str] = off.get("cta_urls", {})
-        url = ctas.get(pkg_key, "")
-
-        if not url:
-            await safe_edit_or_send(q, context, chat_id, "Payment link not available for this package.", offer_packages_kb(idx))
-            return
-
-        await safe_edit_or_send(
-            q, context, chat_id, t(chat_id, "payment_instructions"),
-            InlineKeyboardMarkup([
-                [InlineKeyboardButton(t(chat_id, "btn_pay_now"), url=url)],
-                [InlineKeyboardButton(t(chat_id, "btn_paid"), callback_data=f"offer_paid|{idx}|{pkg_key}")],
-                [InlineKeyboardButton("⬅️ Back", callback_data=f"offer_act|{idx}")]
-            ]),
-            no_preview=True
-        )
-        return
-
-    # Back-compat: if old flow sends offer_agree, route to package picker
-    if data.startswith("offer_agree|"):
-        _, sidx = data.split("|", 1)
-        try:
-            idx = int(sidx)
-        except Exception:
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-        await safe_edit_or_send(q, context, chat_id, "Choose a package:", offer_packages_kb(idx))
-        return
-
-    if data.startswith("offer_paid|"):
-        parts = data.split("|")
-        if len(parts) not in (2, 3):
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-
-        idx = int(parts[1]) if parts[1].isdigit() else -1
-        pkg_key = parts[2] if len(parts) == 3 else "Offer"
-
-        acts = active_offers()
-        if idx < 0 or idx >= len(acts):
-            await safe_edit_or_send(q, context, chat_id, t(chat_id, "offers_none"), main_menu_kb(chat_id))
-            return
-
-        ts = _now_uae().strftime("%Y-%m-%d %H:%M:%S")
-        await context.bot.send_message(chat_id=chat_id,
-                                       text=t(chat_id, "breadcrumb_paid").format(pkg=pkg_key, ts=ts))
-        set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="offer")
-        await _send_phone_prompt(context, chat_id)
-        if ADMIN_CHAT_ID:
-            await context.bot.send_message(chat_id=int(ADMIN_CHAT_ID),
-                                           text=(f"🆕 Offer I Paid (phone pending)\n"
-                                                 f"User: @{user.username or 'N/A'} ({user.id})\n"
-                                                 f"Offer index: {idx}\n"
-                                                 f"Package: {pkg_key}"))
-        return
-
-    # Package selection (subscribe/renew)
-    if data.startswith("pkg|"):
-        _, pkg_name = data.split("|", 1)
-        if pkg_name not in PACKAGES:
-            await safe_edit_or_send(q, context, chat_id, "Package not found.", packages_kb())
-            return
-        set_state(chat_id, package=pkg_name)
-        price = PACKAGES[pkg_name]["price_aed"]
-        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "breadcrumb_sel").format(pkg=pkg_name, price=price))
-        lang = get_state(chat_id).get("lang", "ar")
-        details = pkg_details_for_lang(pkg_name, lang)
-        flow = get_state(chat_id).get("flow", "subscribe")
-        text = f"🛍️ <b>{pkg_name}</b>\n💰 <b>{price} AED</b>\n{details}\n{t(chat_id, 'terms')}"
-        await safe_edit_or_send(q, context, chat_id, text, agree_kb(chat_id, pkg_name, flow), html=True)
-        return
-
-    if data.startswith("agree|"):
-        _, reason, pkg_name = data.split("|", 2)
-        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "breadcrumb_agree").format(pkg=pkg_name))
-        await safe_edit_or_send(q, context, chat_id, t(chat_id, "payment_instructions"), pay_kb(chat_id, pkg_name, reason), no_preview=True)
-        return
-
-    if data.startswith("paid|"):
-        _, reason, pkg_name = data.split("|", 2)
-        ts = _now_uae().strftime("%Y-%m-%d %H:%M:%S")
-        await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "breadcrumb_paid").format(pkg=pkg_name, ts=ts))
-
-        if reason == "renew":
-            set_state(chat_id, awaiting_username=True, awaiting_username_reason="renew")
-            await context.bot.send_message(chat_id=chat_id, text=t(chat_id, "ask_username"))
-        else:
-            set_state(chat_id, awaiting_phone=True, awaiting_phone_reason="subscribe")
-            await _send_phone_prompt(context, chat_id)
-
-        if ADMIN_CHAT_ID:
-            await context.bot.send_message(
-                chat_id=int(ADMIN_CHAT_ID),
-                text=(f"🧾 I Paid clicked\n"
-                      f"User: @{user.username or 'N/A'} (id: {user.id})\n"
-                      f"Package: {pkg_name}\n"
-                      f"Reason: {reason}\n"
-                      f"Phone: pending")
-            )
-        return
-
-    # Fallback
-    await safe_edit_or_send(q, context, chat_id, t(chat_id, "welcome"), main_menu_kb(chat_id))
 
 # ------------------------- ERROR HANDLER -------------------------
-async def handle_error(update: Optional[Update], context: ContextTypes.DEFAULT_TYPE):
+async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.exception("Handler error: %s", context.error)
 
 # ------------------------- STARTUP -------------------------
@@ -1189,6 +824,31 @@ async def _post_init(application: Application):
             await application.bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
         logging.warning("Webhook init/cleanup failed: %s", e)
+    # Setup bot commands (left-side menu)
+    try:
+        base_commands = [
+            BotCommand("start", "Start / Pick language"),
+            BotCommand("packages", "Packages & subscription"),
+            BotCommand("offers", "Current offers"),
+            BotCommand("renew", "Renew subscription"),
+            BotCommand("trial", "Free trial"),
+            BotCommand("support", "Support / contact us"),
+        ]
+        # Default commands for all users
+        await application.bot.set_my_commands(base_commands)
+
+        # Extra admin commands (visible only in admin chat)
+        if ADMIN_CHAT_ID:
+            admin_commands = base_commands + [
+                BotCommand("status", "Admin: bot status"),
+                BotCommand("offers_now", "Admin: active offers"),
+                BotCommand("upcoming_offers", "Admin: upcoming offers"),
+                BotCommand("offer_reload", "Admin: reload offers file"),
+                BotCommand("debug_id", "Admin: debug chat/user id"),
+            ]
+            await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=ADMIN_CHAT_ID))
+    except Exception as e:
+        logging.warning("Failed to set bot commands: %s", e)
 
 # ------------------------- MAIN -------------------------
 def main():
@@ -1202,6 +862,11 @@ def main():
     # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("packages", packages_cmd))
+    app.add_handler(CommandHandler("renew", renew_cmd))
+    app.add_handler(CommandHandler("trial", trial_cmd))
+    app.add_handler(CommandHandler("support", support_cmd))
+    app.add_handler(CommandHandler("offers", offers_cmd))
     app.add_handler(CommandHandler("done", done_cmd))  # support finalize
 
     # Admin
